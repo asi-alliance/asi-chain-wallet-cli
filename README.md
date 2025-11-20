@@ -1,11 +1,5 @@
 # ASI Chain Wallet CLI
 
-## Build
-
-```bash
-cargo build --release
-```
-
 ## Setup
 
 Create a `.env` file:
@@ -14,7 +8,26 @@ Create a `.env` file:
 cp .env.example .env
 ```
 
-Edit `.env` with configuration. At least <VALIDATOR_IP> and <OBSERVER_IP> are needed to be filled in.
+Edit `.env` with configuration. At least `<VALIDATOR_IP>` and `<OBSERVER_IP>` are needed to be filled in.
+
+Initialize submodules:
+
+```bash
+git submodule init
+git submodule update
+```
+
+Keep rust-client submodule up-to-date by running:
+
+```bash
+git submodule update --init --remote -- rust-client
+``` 
+
+## Build
+
+```bash
+cargo build --release
+```
 
 ## Usage
 
