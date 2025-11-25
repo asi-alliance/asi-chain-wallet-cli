@@ -64,6 +64,22 @@ Examples:
 - 1 token = `100000000`
 - 10 token = `1000000000`
 
+### Monitor deploy history in real-time
+
+```bash
+cargo run -- history
+```
+
+Or with a custom limit (default is 10):
+
+```bash
+cargo run -- history --limit 20
+```
+
+This command:
+- Displays the last N deployments (both incoming/outgoing transfers and other deployments)
+- Continuously monitors for new transactions via WebSocket subscription
+
 ## Help
 
 ```bash
