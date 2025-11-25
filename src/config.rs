@@ -22,6 +22,23 @@ pub struct Config {
     pub output_dir: String,
     pub token: String,
     pub verbose_logs: bool,
+    pub graphql_url: String,
+}
+
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        Self {
+            validator_host: self.validator_host.clone(),
+            validator_grpc_port: self.validator_grpc_port,
+            validator_http_port: self.validator_http_port,
+            observer_host: self.observer_host.clone(),
+            observer_grpc_port: self.observer_grpc_port,
+            output_dir: self.output_dir.clone(),
+            token: self.token.clone(),
+            verbose_logs: self.verbose_logs,
+            graphql_url: self.graphql_url.clone(),
+        }
+    }
 }
 
 impl Config {
@@ -50,6 +67,8 @@ impl Config {
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
                 .unwrap_or(false),
+
+            graphql_url: env::var("GRAPHQL_URL").unwrap(),
         })
     }
 
