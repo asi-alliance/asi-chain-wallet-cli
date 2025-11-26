@@ -1,4 +1,7 @@
 use crate::config::Config;
+use crate::requests::graphql::{
+    build_new_deployments_subscription, build_recent_deployments_query,
+};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use futures_util::{SinkExt, StreamExt};
@@ -68,47 +71,8 @@ async fn subscribe_deployments(
     }
 
     // Fetch last N deployments for specific wallet
-    let initial_query = r#"
-        query GetRecentDeployments($publicKey: String!, $address: String!, $limit: Int!) {
-            deployments(
-                where: {
-                    _or: [
-                        { deployer: { _eq: $publicKey } }
-                        { transfers: { to_address: { _eq: $address } } }
-                    ]
-                }
-                order_by: { block_number: desc }
-                limit: $limit
-            ) {
-                deploy_id
-                block_number
-                created_at
-                status
-                block {
-                    finalization_status
-                }
-                transfers {
-                    id
-                    from_address
-                    to_address
-                    amount_dust
-                }
-            }
-        }
-    "#;
-
-    let initial_message = json!({
-        "id": "init",
-        "type": "start",
-        "payload": {
-            "query": initial_query,
-            "variables": {
-                "publicKey": public_key,
-                "address": address,
-                "limit": limit
-            }
-        }
-    });
+    let initial_message =
+        build_recent_deployments_query("init", "start", public_key, address, limit);
 
     write
         .send(Message::Text(initial_message.to_string()))
@@ -177,51 +141,8 @@ async fn subscribe_deployments(
     }
 
     // Now subscribe to new deployments only
-    let subscription_query = r#"
-        subscription WatchNewDeployments($publicKey: String!, $address: String!, $startTime: timestamp!) {
-            deployments(
-                where: {
-                    _and: [
-                        { created_at: { _gt: $startTime } }
-                        {
-                            _or: [
-                                { deployer: { _eq: $publicKey } }
-                                { transfers: { to_address: { _eq: $address } } }
-                            ]
-                        }
-                    ]
-                }
-                order_by: { block_number: asc }
-            ) {
-                deploy_id
-                block_number
-                created_at
-                status
-                block {
-                    finalization_status
-                }
-                transfers {
-                    id
-                    from_address
-                    to_address
-                    amount_dust
-                }
-            }
-        }
-    "#;
-
-    let subscribe_message = json!({
-        "id": "1",
-        "type": "start",
-        "payload": {
-            "query": subscription_query,
-            "variables": {
-                "publicKey": public_key,
-                "address": address,
-                "startTime": last_timestamp
-            }
-        }
-    });
+    let subscribe_message =
+        build_new_deployments_subscription("1", "start", public_key, address, &last_timestamp);
 
     write
         .send(Message::Text(subscribe_message.to_string()))

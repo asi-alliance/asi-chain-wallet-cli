@@ -1,6 +1,7 @@
 mod commands;
 mod config;
 mod models;
+mod requests;
 mod utils;
 
 use clap::{Parser, Subcommand};
