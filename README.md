@@ -80,6 +80,35 @@ This command:
 - Displays the last N deployments (both incoming/outgoing transfers and other deployments)
 - Continuously monitors for new transactions via WebSocket subscription
 
+### Export wallet data
+
+Export wallet transaction history to a file for analysis or sharing:
+
+```bash
+# Export as JSON (default)
+cargo run -- export
+```
+
+**Options:**
+
+```bash
+cargo run -- export --format json
+
+# Export in CSV format
+cargo run -- export --format csv
+
+# Specify custom output path
+cargo run -- export --output my_data.json
+
+# Export with custom limit (default is 100)
+cargo run -- export --limit 50
+
+# Combine options
+cargo run -- export --format csv --output reports/wallet_2024.csv --limit 200
+```
+
+Exported files are saved to the `exports/` directory by default with timestamp-based filenames.
+
 ## Help
 
 ```bash

@@ -37,6 +37,17 @@ pub enum Commands {
         #[arg(short, long)]
         limit: Option<u32>,
     },
+
+    Export {
+        #[arg(short, long, value_enum, default_value_t = ExportFormat::Json)]
+        format: ExportFormat,
+
+        #[arg(short, long)]
+        output: Option<String>,
+
+        #[arg(short, long)]
+        limit: Option<u32>,
+    },
 }
 
 impl Cli {
@@ -64,6 +75,11 @@ async fn main() {
         Some(Commands::Balance {}) => handle_get_balance().await,
         Some(Commands::Send { to, amount }) => handle_send(to, *amount).await,
         Some(Commands::History { limit }) => handle_get_history(&config, *limit).await,
+        Some(Commands::Export {
+            format,
+            output,
+            limit,
+        }) => handle_export(&config, format, output.as_deref(), *limit).await,
         None => {
             Cli::print_default_help();
             Ok(())

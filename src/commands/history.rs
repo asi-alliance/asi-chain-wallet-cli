@@ -2,15 +2,14 @@ use crate::config::Config;
 use crate::requests::graphql::{
     build_new_deployments_subscription, build_recent_deployments_query,
 };
-use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
-use futures_util::{SinkExt, StreamExt};
-use serde_json::json;
-use std::collections::HashSet;
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::{client::IntoClientRequest, protocol::Message},
+use crate::utils::deployment::{
+    format_deployment_timestamp, get_deployment_field, get_deployment_status,
 };
+use crate::utils::websocket::connect_graphql_websocket;
+use anyhow::{Context, Result};
+use futures_util::{SinkExt, StreamExt};
+use std::collections::HashSet;
+use tokio_tungstenite::tungstenite::protocol::Message;
 
 pub async fn handle_get_history(config: &Config, limit: Option<u32>) -> Result<()> {
     let wallet = config.get_wallet()?;
@@ -37,40 +36,8 @@ async fn subscribe_deployments(
     public_key: &str,
     limit: u32,
 ) -> Result<()> {
-    let mut request = graphql_url.into_client_request()?;
-    request
-        .headers_mut()
-        .insert("Sec-WebSocket-Protocol", "graphql-ws".parse().unwrap());
-
-    println!(">>> Connecting to WebSocket...");
-
-    let (ws_stream, _) = connect_async(request)
-        .await
-        .context("Failed to connect to WebSocket")?;
-
-    let (mut write, mut read) = ws_stream.split();
-
-    let connection_init = json!({
-        "type": "connection_init",
-        "payload": {}
-    });
-    write
-        .send(Message::Text(connection_init.to_string()))
-        .await
-        .context("Failed to send connection_init")?;
-
-    while let Some(msg) = read.next().await {
-        if let Ok(Message::Text(text)) = msg {
-            if let Ok(response) = serde_json::from_str::<serde_json::Value>(&text) {
-                if response.get("type").and_then(|v| v.as_str()) == Some("connection_ack") {
-                    println!("✓ Connected to WebSocket");
-                    break;
-                }
-            }
-        }
-    }
-
-    // Fetch last N deployments for specific wallet
+    let (mut write, mut read) = connect_graphql_websocket(graphql_url).await?;
+    // Query last deployments by `limit`
     let initial_message =
         build_recent_deployments_query("init", "start", public_key, address, limit);
 
@@ -79,7 +46,7 @@ async fn subscribe_deployments(
         .await
         .context("Failed to send initial query")?;
 
-    // Process initial results
+    // Display deployments of recent history
     let mut initial_received = false;
     let mut last_timestamp = chrono::Utc::now().to_rfc3339();
 
@@ -106,7 +73,7 @@ async fn subscribe_deployments(
                                             println!("\n[HIST] Recent History (last {}):\n", limit);
 
                                             for deployment in &deployments {
-                                                display_deployment(deployment, public_key);
+                                                display_deployment(deployment, address);
 
                                                 if let Some(created) = deployment
                                                     .get("created_at")
@@ -177,7 +144,7 @@ async fn subscribe_deployments(
                                                         .unwrap_or("");
 
                                                     if !displayed_deploys.contains(deploy_id) {
-                                                        display_deployment(&deployment, public_key);
+                                                        display_deployment(&deployment, address);
                                                         displayed_deploys
                                                             .insert(deploy_id.to_string());
                                                     }
@@ -215,74 +182,28 @@ async fn subscribe_deployments(
     Ok(())
 }
 
-fn display_deployment(deployment: &serde_json::Value, public_key: &str) {
+fn display_deployment(deployment: &serde_json::Value, wallet_address: &str) {
     println!("{}", "=".repeat(80));
 
-    let deploy_id = deployment
-        .get("deploy_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-    let block_number = deployment
-        .get("block_number")
-        .and_then(|v| v.as_str())
-        .unwrap_or("0");
-    let status = deployment
-        .get("status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-    let finalize_status = deployment
-        .get("block")
-        .and_then(|b| b.get("finalization_status"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-
-    let created_at = deployment
-        .get("created_at")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let formatted_date = if !created_at.is_empty() {
-        if let Ok(parsed_timestamp) = created_at.parse::<i64>() {
-            let dt = DateTime::<Utc>::from_timestamp(parsed_timestamp / 1000, 0)
-                .unwrap_or_else(|| Utc::now());
-            dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
-        } else {
-            created_at.to_string()
-        }
-    } else {
-        "N/A".to_string()
-    };
+    let deploy_id = get_deployment_field(deployment, "deploy_id", "unknown");
+    let block_number = get_deployment_field(deployment, "block_number", "0");
+    let status = get_deployment_status(deployment);
+    let formatted_date = format_deployment_timestamp(deployment);
 
     println!("Deploy ID: {}", deploy_id);
     println!("Block: #{}", block_number);
-    println!(
-        "Status: {}",
-        if status == "included" {
-            finalize_status
-        } else {
-            status
-        }
-    );
+    println!("Status: {}", status);
     println!("Created at: {}", formatted_date);
 
     if let Some(transfers) = deployment.get("transfers").and_then(|v| v.as_array()) {
         if !transfers.is_empty() {
             println!("\n 💳  Associated Transfers:");
             for transfer in transfers {
-                let from_address = transfer
-                    .get("from_address")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let to_address = transfer
-                    .get("to_address")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let amount_dust = transfer
-                    .get("amount_dust")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("0");
+                let from_address = get_deployment_field(transfer, "from_address", "unknown");
+                let to_address = get_deployment_field(transfer, "to_address", "unknown");
+                let amount_dust = get_deployment_field(transfer, "amount_dust", "0");
 
-                if from_address == public_key {
+                if from_address == wallet_address {
                     println!("  → OUT | {} dust", amount_dust);
                     println!("     To: {}", to_address);
                 } else {

@@ -1,5 +1,9 @@
+# Build files
 /target
+
+# User specific
 /credentials
+/exports
 
 .env
 *.lock
