@@ -18,7 +18,6 @@ pub async fn handle_get_history(config: &Config, limit: Option<u32>) -> Result<(
     println!("\n>>> Starting real-time deploy monitoring...");
     println!("Wallet: {}", wallet.address);
     println!("Public Key: {}", wallet.public_key);
-    println!("{}", "=".repeat(80));
 
     let graphql_url = config.graphql_url.clone();
     let address = wallet.address.clone();
@@ -70,7 +69,7 @@ async fn subscribe_deployments(
                                             deployments.reverse();
 
                                             println!("{}", "=".repeat(80));
-                                            println!("\n[HIST] Recent History (last {}):\n", limit);
+                                            println!("\nRecent History (last {}):\n", limit);
 
                                             for deployment in &deployments {
                                                 display_deployment(deployment, address);

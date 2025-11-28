@@ -50,6 +50,12 @@ pub async fn handle_export(
     .await?;
 
     let records = convert_to_records(deployments, &wallet.address)?;
+
+    if records.is_empty() {
+        println!("\nNo deployments found for the specified wallet.");
+        return Ok(());
+    }
+
     let output_path = determine_output_path(output, format)?;
 
     match format {
@@ -57,7 +63,7 @@ pub async fn handle_export(
         ExportFormat::Csv => export_csv(&records, &output_path)?,
     }
 
-    println!("✓ Data exported successfully to: {}", output_path);
+    println!("\n✓ Data exported successfully to: {}", output_path);
     println!("  Total records: {}", records.len());
 
     Ok(())

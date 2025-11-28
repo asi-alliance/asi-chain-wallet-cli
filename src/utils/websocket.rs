@@ -11,7 +11,7 @@ pub type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>
 pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub async fn connect_graphql_websocket(graphql_url: &str) -> Result<(WsSink, WsStream)> {
-    println!(">>> Connecting to WebSocket...");
+    println!("\n>>> Connecting to WebSocket...");
     let mut request = graphql_url.into_client_request()?;
     request
         .headers_mut()
@@ -44,5 +44,5 @@ pub async fn connect_graphql_websocket(graphql_url: &str) -> Result<(WsSink, WsS
         }
     }
 
-    Err(anyhow::anyhow!("Failed to receive connection_ack"))
+    Err(anyhow::anyhow!("✗ Failed to receive connection_ack"))
 }

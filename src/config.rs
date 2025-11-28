@@ -11,6 +11,7 @@ pub struct WalletInfo {
     pub address: String,
 }
 
+#[derive(Debug)]
 pub struct Config {
     pub validator_host: String,
     pub validator_grpc_port: u16,
@@ -44,31 +45,32 @@ impl Clone for Config {
 impl Config {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
-            validator_host: env::var("VALIDATOR_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            validator_host: env::var("VALIDATOR_HOST")
+                .context("VALIDATOR_HOST is not set in .env")?,
             validator_grpc_port: env::var("VALIDATOR_GRPC_PORT")
-                .unwrap_or_else(|_| "40412".to_string())
+                .context("VALIDATOR_GRPC_PORT is not set in .env")?
                 .parse()
                 .context("Invalid VALIDATOR_GRPC_PORT value")?,
             validator_http_port: env::var("VALIDATOR_HTTP_PORT")
-                .unwrap_or_else(|_| "40413".to_string())
+                .context("VALIDATOR_HTTP_PORT is not set in .env")?
                 .parse()
                 .context("Invalid VALIDATOR_HTTP_PORT value")?,
 
-            observer_host: env::var("OBSERVER_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            observer_host: env::var("OBSERVER_HOST").context("OBSERVER_HOST is not set in .env")?,
             observer_grpc_port: env::var("OBSERVER_GRPC_PORT")
-                .unwrap_or_else(|_| "40452".to_string())
+                .context("OBSERVER_GRPC_PORT is not set in .env")?
                 .parse()
                 .context("Invalid OBSERVER_GRPC_PORT value")?,
 
-            output_dir: env::var("OUTPUT_DIR").unwrap_or_else(|_| "./credentials".to_string()),
-            token: env::var("TOKEN").unwrap_or_else(|_| "ASI".to_string()),
+            output_dir: env::var("OUTPUT_DIR").context("OUTPUT_DIR is not set in .env")?,
+            token: env::var("TOKEN").context("TOKEN is not set in .env")?,
 
             verbose_logs: env::var("VERBOSE_LOGS")
-                .unwrap_or_else(|_| "false".to_string())
+                .context("VERBOSE_LOGS is not set in .env")?
                 .parse()
-                .unwrap_or(false),
+                .context("Invalid VERBOSE_LOGS value (expected true/false)")?,
 
-            graphql_url: env::var("GRAPHQL_URL").unwrap(),
+            graphql_url: env::var("GRAPHQL_URL").context("GRAPHQL_URL is not set in .env")?,
         })
     }
 
