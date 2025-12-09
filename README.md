@@ -26,27 +26,26 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 5. [Commands](#commands)
 6. [Token Decimals](#token-decimals)
 7. [Project Structure](#project-structure)
-8. [License](#license)
 
 ---
 
 ## Overview
 
-ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain blockchain. It provides wallet management, token transfers, balance checking, and transaction history monitoring capabilities.
+ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain blockchain. It provides wallet management, token transfers, balance checking, and deploy history monitoring capabilities.
 
 **Key Features:**
 
-- Create and manage ASI Chain wallets
+- Create ASI Chain wallet
 - Check wallet balance
 - Send ASI tokens to other addresses
 - Monitor deploy history in real-time via WebSocket
-- Export transaction history to JSON or CSV format
+- Export deploy history to JSON or CSV format
 
 ## Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) (edition 2024)
 - Access to ASI Chain network nodes (Validator and Observer)
-- GraphQL API endpoint for transaction history
+- GraphQL API endpoint for deploy history
 
 ## Installation
 
@@ -97,7 +96,7 @@ GRAPHQL_URL=<GRAPHQL_API_ENDPOINT>
 
 | Variable | Description |
 |----------|-------------|
-| `VALIDATOR_HOST` | IP address of the validator node for sending transactions |
+| `VALIDATOR_HOST` | IP address of the validator node for sending deploys |
 | `VALIDATOR_GRPC_PORT` | gRPC port of the validator node (default: 40432) |
 | `VALIDATOR_HTTP_PORT` | HTTP port of the validator node (default: 40433) |
 | `OBSERVER_HOST` | IP address of the observer node for read operations |
@@ -105,7 +104,7 @@ GRAPHQL_URL=<GRAPHQL_API_ENDPOINT>
 | `OUTPUT_DIR` | Directory for storing wallet credentials (default: ./credentials) |
 | `TOKEN` | Token name (default: ASI) |
 | `VERBOSE_LOGS` | Show detailed logs from rust-client (default: false) |
-| `GRAPHQL_URL` | GraphQL API endpoint for transaction history |
+| `GRAPHQL_URL` | GraphQL API endpoint for deploy history |
 
 ## Commands
 
@@ -147,7 +146,7 @@ cargo run -- send --to <recipient-address> --amount <amount>
 cargo run -- send --to 1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g --amount 100000000
 ```
 
-### Transaction History
+### Deploy History
 
 Monitor deploy history in real-time:
 
@@ -162,11 +161,11 @@ cargo run -- history --limit 20
 cargo run -- hist --limit 20
 ```
 
-This command displays recent deployments and continuously monitors for new transactions via WebSocket subscription.
+This command displays recent deployments and continuously monitors for new deploys via WebSocket subscription.
 
 ### Export Data
 
-Export wallet transaction history:
+Export wallet deploy history:
 
 ```bash
 # Export as JSON (default)
