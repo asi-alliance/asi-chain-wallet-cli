@@ -1,0 +1,7 @@
+services:
+  wallet-cli:
+    build: .
+    env_file: .env
+    volumes:
+      - ./credentials:/app/credentials
+      - ./exports:/app/exports

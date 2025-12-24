@@ -58,6 +58,11 @@ git submodule init
 git submodule update
 ```
 
+Keep rust-client submodule up-to-dated by running:
+```bash
+git submodule update --init --remote -- rust-client 
+```
+
 Build the project:
 
 ```bash
@@ -192,6 +197,25 @@ Display available commands:
 
 ```bash
 cargo run -- help
+```
+
+## Docker
+
+You can build and run the wallet CLI using Docker instead of compiling from source.
+
+### Build Docker Image
+
+```bash
+docker build -t wallet-cli .
+```
+
+### Run with Docker Compose 
+
+Run commands:
+
+```bash
+docker compose run --rm wallet-cli balance
+docker compose run --rm wallet-cli send --to <ADDRESS> --amount 1000
 ```
 
 ## Token Decimals
