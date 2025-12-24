@@ -88,7 +88,7 @@ OBSERVER_HOST=<OBSERVER_IP>
 OBSERVER_GRPC_PORT=40452
 
 OUTPUT_DIR=./credentials
-TOKEN="ASI"
+TOKEN=ASI
 
 # Logging control: set to "true" to show all logs from rust-client, "false" to hide them
 VERBOSE_LOGS=false
