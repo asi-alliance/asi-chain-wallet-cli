@@ -26,6 +26,7 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 5. [Commands](#commands)
 6. [Token Decimals](#token-decimals)
 7. [Project Structure](#project-structure)
+8. [Contributing](#contributing)
 
 ---
 
