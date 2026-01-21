@@ -26,6 +26,7 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 5. [Commands](#commands)
 6. [Token Decimals](#token-decimals)
 7. [Project Structure](#project-structure)
+8. [Contributing](#contributing)
 
 ---
 
@@ -254,4 +255,9 @@ asi-chain-wallet-cli/
 │       └── websocket.rs    # WebSocket connection
 └── rust-client/            # Submodule: low-level node CLI
 ```
+
+## Contributing
+
+Known issues and bugs are tracked in the [Issues](https://github.com/asi-alliance/asi-chain-wallet-cli/issues) section.  
+If you encounter a problem that is not listed, please feel free to open a new issue and provide as much detail as possible.
 
