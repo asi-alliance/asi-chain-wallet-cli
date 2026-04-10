@@ -21,7 +21,6 @@ pub struct Config {
     pub observer_grpc_port: u16,
 
     pub output_dir: String,
-    pub token: String,
     pub verbose_logs: bool,
     pub graphql_url: String,
 }
@@ -35,7 +34,6 @@ impl Clone for Config {
             observer_host: self.observer_host.clone(),
             observer_grpc_port: self.observer_grpc_port,
             output_dir: self.output_dir.clone(),
-            token: self.token.clone(),
             verbose_logs: self.verbose_logs,
             graphql_url: self.graphql_url.clone(),
         }
@@ -63,8 +61,6 @@ impl Config {
                 .context("Invalid OBSERVER_GRPC_PORT value")?,
 
             output_dir: env::var("OUTPUT_DIR").context("OUTPUT_DIR is not set in .env")?,
-            token: env::var("TOKEN").context("TOKEN is not set in .env")?,
-
             verbose_logs: env::var("VERBOSE_LOGS")
                 .context("VERBOSE_LOGS is not set in .env")?
                 .parse()

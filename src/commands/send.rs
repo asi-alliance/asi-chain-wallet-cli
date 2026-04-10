@@ -43,7 +43,8 @@ pub async fn send(
         check_interval: 10,
         observer_host: Some(config.observer_host.clone()),
         observer_grpc_port: Some(config.observer_grpc_port),
-        token: config.token.clone(),
+        expires_in: Some(30 * 60), // 30 minutes
+        expiration: None,
     };
 
     let _gags = if silent {
@@ -65,7 +66,7 @@ pub async fn handle_send(to: &str, amount: u64) -> Result<()> {
 
     check_send_conditions(&config, wallet_info.address, amount, to).await?;
 
-    println!("Sending {} {} to {}...", amount, config.token, to);
+    println!("Sending {} tokens to {}...", amount, to);
 
     let (deploy_info, deploy_id) = send(
         &config,

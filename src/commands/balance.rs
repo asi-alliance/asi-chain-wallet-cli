@@ -7,7 +7,6 @@ pub async fn get_balance(config: &Config, wallet_address: String, silent: bool) 
         host: config.observer_host.clone(),
         grpc_port: config.observer_grpc_port,
         address: wallet_address.to_string(),
-        token: config.token.clone(),
     };
 
     let _gags = if silent {
