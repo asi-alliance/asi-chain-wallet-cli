@@ -261,3 +261,8 @@ asi-chain-wallet-cli/
 Known issues and bugs are tracked in the [Issues](https://github.com/asi-alliance/asi-chain-wallet-cli/issues) section.  
 If you encounter a problem that is not listed, please feel free to open a new issue and provide as much detail as possible.
 
+---
+
+## License
+
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) file for details.
