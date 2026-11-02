@@ -10,7 +10,11 @@ async fn check_send_conditions(
     amount: u64,
     to: &str,
 ) -> Result<()> {
-    if get_balance(config, wallet_address, true).await? < amount {
+    // Changed for the cost-accounted f1r3node (ASI:Chain migration, WC-2): the
+    // node does not include an offer whose vault cannot hold its ceiling, the
+    // 5,000,000,000-phlo limit times price 1 plus the fee of 1 (in dust).
+    // if get_balance(config, wallet_address, true).await? < amount {
+    if get_balance(config, wallet_address, true).await? < amount.saturating_add(5_000_000_001) {
         return Err(anyhow!("Insufficient balance to complete the transfer"));
     }
     if to.is_empty() {
