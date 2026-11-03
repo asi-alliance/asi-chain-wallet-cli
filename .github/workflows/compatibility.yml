@@ -1,0 +1,57 @@
+name: Wallet compatibility
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wallet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2026-02-09
+          components: rustfmt, clippy
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libssl-dev pkg-config cmake libclang-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wallet-client-029
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --features integration --locked -- -D warnings
+      - run: cargo test --release --locked
+      - run: cargo build --release --locked
+  node-compatibility:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      FIREFLY_NODE_IMAGE: public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2026-02-09
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libssl-dev pkg-config cmake libclang-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wallet-client-029
+      - run: cargo test --release --features integration --test node_compatibility --locked -- --nocapture
+      - name: Tear down the owned shard
+        if: always()
+        run: |
+          if [ -f target/integration-shard/shard.env ]; then
+            docker compose -p rust-client-it --env-file target/integration-shard/shard.env -f tests/integration/topology/compose.yml --profile joiner down -v --remove-orphans
+          fi

@@ -59,15 +59,16 @@ git submodule init
 git submodule update
 ```
 
-Keep rust-client submodule up-to-dated by running:
+The submodule is pinned to the reviewed ASI client commit. Use the recorded gitlink;
+do not use `--remote` to replace it with a moving branch:
 ```bash
-git submodule update --init --remote -- rust-client 
+git submodule update --init --recursive
 ```
 
 Build the project:
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ```
 
 ## Configuration
@@ -81,36 +82,68 @@ cp .env.example .env
 Edit `.env` with your network configuration:
 
 ```env
-VALIDATOR_HOST=<VALIDATOR_IP>
-VALIDATOR_GRPC_PORT=40432
-VALIDATOR_HTTP_PORT=40433
-
-OBSERVER_HOST=<OBSERVER_IP>
-OBSERVER_GRPC_PORT=40452
-
+VALIDATOR_GRPC_URL=http://127.0.0.1:40412
+VALIDATOR_HTTP_URL=http://127.0.0.1:40413
+OBSERVER_HTTP_URL=http://127.0.0.1:40453
 OUTPUT_DIR=./credentials
-TOKEN=ASI
-
-# Logging control: set to "true" to show all logs from rust-client, "false" to hide them
+EXPECTED_TOKEN_SYMBOL=ASI
+SHARD_ID=root
 VERBOSE_LOGS=false
-
-# For deploy history
-GRAPHQL_URL=<GRAPHQL_API_ENDPOINT>
+GRAPHQL_URL=wss://your-gateway.example/v1/graphql
 ```
 
-**Required Configuration:**
+These loopback ports illustrate a locally mapped validator/observer; use the
+actual endpoints of your deployment. HTTP URLs support a gateway base path.
+`https://` uses TLS; optional `NODE_CA_CERT` supplies a private CA for all endpoints.
+`NODE_CONNECT_TIMEOUT_SECONDS` / `NODE_TIMEOUT_SECONDS` default to 10 / 30.
 
-| Variable | Description |
-|----------|-------------|
-| `VALIDATOR_HOST` | IP address of the validator node for sending deploys |
-| `VALIDATOR_GRPC_PORT` | gRPC port of the validator node (default: 40432) |
-| `VALIDATOR_HTTP_PORT` | HTTP port of the validator node (default: 40433) |
-| `OBSERVER_HOST` | IP address of the observer node for read operations |
-| `OBSERVER_GRPC_PORT` | gRPC port of the observer node (default: 40452) |
-| `OUTPUT_DIR` | Directory for storing wallet credentials (default: ./credentials) |
-| `TOKEN` | Token name (default: ASI) |
-| `VERBOSE_LOGS` | Show detailed logs from rust-client (default: false) |
-| `GRAPHQL_URL` | GraphQL API endpoint for deploy history |
+Legacy `VALIDATOR_HOST` plus `VALIDATOR_GRPC_PORT` / `VALIDATOR_HTTP_PORT`
+remain supported when URLs are absent. For the observer, supply
+`OBSERVER_HTTP_URL` or `OBSERVER_HOST` plus **`OBSERVER_HTTP_PORT`** explicitly.
+`OBSERVER_GRPC_PORT` is no longer used. HTTP ports are never inferred from gRPC.
+
+`GRAPHQL_URL` is needed only for history/export. Its schema/permissions must
+match the selected indexer/Hasura release; do not put admin credentials into a
+public URL. Secure WebSocket (`wss`) transport is enabled.
+
+`DEPLOY_MAX_WAIT_SECONDS` defaults to 480 and
+`DEPLOY_CHECK_INTERVAL_SECONDS` to 5. Both must be positive; the poll interval
+must not exceed the total wait budget.
+
+## Compatibility baseline and tests
+
+This update uses ASI client `77cbdc8180d8f83a7216dbf54b23268106ea3e91`
+from [client PR #3](https://github.com/asi-alliance/asi-chain-client/pull/3),
+`node_cli 0.2.9`, with CLI dependencies disabled. All node protocol crates
+are pinned there to `f1r3node-rust` source
+`5dafbc37dad3ebf3da810641fc0d8cecd5a1127b`. The root Cargo.lock and
+`nightly-2026-02-09` pin dependency resolution and compiler selection.
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --features integration --locked -- -D warnings
+cargo test --release --locked
+cargo build --release --locked
+cargo test --release --features integration --test node_compatibility --locked
+```
+
+The last command requires Docker and creates its own shard with fresh test
+keys/state. It uses the existing immutable linux/amd64 image:
+
+```text
+public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df
+```
+
+It reuses fixture helpers from the exact pinned client submodule and the
+versioned topology in `tests/integration/topology`. Loopback ports 40400-40462
+must be free; an existing `rust-client-it` project causes refusal before any
+cleanup. Only its freshly created shard is torn down. No node build or existing
+genesis change is performed.
+
+See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
+The wallet command test checks exact balances/transfers, vault rejection and
+an intentionally withheld finalization verdict. Full history/export acceptance
+against the deployed Hasura schema remains a separate staging requirement.
 
 ## Commands
 
@@ -151,6 +184,13 @@ cargo run -- send --to <recipient-address> --amount <amount>
 ```bash
 cargo run -- send --to 1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g --amount 100000000
 ```
+
+A deploy ID is printed before submission, so a lost response still leaves a
+queryable identifier. Success requires canonical finalization and a positive
+vault result. A rejected/failed/expired transfer exits non-zero. Missing or
+conflicting verdicts, transport errors and timeouts also exit non-zero and
+report an unknown outcome with the original deploy ID. Check that ID; never
+create a replacement payment automatically.
 
 ### Deploy History
 
@@ -221,7 +261,12 @@ docker compose run --rm wallet-cli send --to <ADDRESS> --amount 1000
 
 ## Token Decimals
 
-ASI token uses 8 decimal places. When specifying amounts:
+`--amount` is an exact unsigned integer in raw base units (dust), up to
+`2^256 - 1`. Zero, negative, fractional, exponent and overflowing inputs fail.
+No floating-point scaling is performed. Balance display uses the node's native
+token metadata and checks the expected symbol/shard before queries or transfers.
+
+For an ASI network configured with **8 decimals**, the conversion is:
 
 | Human Amount | CLI Amount |
 |--------------|------------|
@@ -230,7 +275,7 @@ ASI token uses 8 decimal places. When specifying amounts:
 | 10 ASI | 1000000000 |
 | 100 ASI | 10000000000 |
 
-**Formula:** `CLI Amount = Human Amount × 10^8`
+**Formula:** `CLI Amount = Human Amount × 10^decimals`, with decimals from the actual network.
 
 ## Project Structure
 
