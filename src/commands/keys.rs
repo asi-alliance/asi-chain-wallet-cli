@@ -8,7 +8,7 @@ use std::path::Path;
 pub fn handle_create_wallet(save: bool) -> Result<()> {
     let config = Config::from_env()?;
 
-    let (secret_key, public_key) = CryptoUtils::generate_key_pair()?;
+    let (secret_key, public_key) = CryptoUtils::generate_key_pair();
     let private_key_hex = CryptoUtils::serialize_private_key(&secret_key);
     let pub_key_hex = CryptoUtils::serialize_public_key(&public_key, false);
     let address = CryptoUtils::generate_vault_address(&pub_key_hex)?;
