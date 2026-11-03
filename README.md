@@ -27,6 +27,7 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 6. [Token Decimals](#token-decimals)
 7. [Project Structure](#project-structure)
 8. [Contributing](#contributing)
+9. [Branch status and client dependency](#branch-status-and-client-dependency)
 
 ---
 
@@ -42,6 +43,51 @@ ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain b
 - Monitor deploy history in real-time via WebSocket
 - Export deploy history to JSON or CSV format
 
+## Branch status and client dependency
+
+Verified on 2026-11-03. Branches with the same name in different repositories
+have different roles. Check current PR/ref status before starting new work.
+
+| Wallet CLI branch | Current role | Use for the current Rust-node integration |
+|---|---|---|
+| `dev` | Active integration branch; #6 merged as `3a8f31e030a5d3d78e7abdc3b3fce6cd326ec8f0` | Start current work here. It contains the tested ASI client 0.2.9 adaptation for node 0.4.46. |
+| `main` | Repository default and release branch; still `cd5d37ce651119c39de58e910db538729948e270` while [#3](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/3) is open | Await the reviewed dev-to-main promotion for this integration. Main is a release branch, not deprecated. A plain default-branch clone currently gets older code. |
+| `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
+| `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
+
+The dependency is the **gitlink**, not a sibling checkout, the fork's default
+branch, or a matching package version. The current wallet integration pins
+[`asi-alliance/asi-chain-client` at `77cbdc8180d8f83a7216dbf54b23268106ea3e91`](https://github.com/asi-alliance/asi-chain-client/commit/77cbdc8180d8f83a7216dbf54b23268106ea3e91).
+Use `git submodule update --init --recursive`; do not use `--remote` to substitute
+a moving head. Keep this pin until a separate API/node compatibility review
+accepts a replacement.
+
+| Client repository branch | Current status |
+|---|---|
+| `dev` | Active ASI integration branch after [client #3](https://github.com/asi-alliance/asi-chain-client/pull/3) merged as `40f2a94`. It contains the tested runtime `77cbdc8`; keep using the wallet's exact gitlink rather than moving dev. |
+| `main` | Currently matches upstream release v0.2.9. It is not the tested ASI integration commit simply because its version is 0.2.9. Future ASI release promotion is separate. |
+| `asi-main` | Historical ASI 0.1.1 line; still the GitHub default during the transition. It is not the current wallet dependency. |
+| `asi-dev` | Older separate ASI line, with a unique OpenSSL/target-configuration commit; not the selected wallet baseline. |
+
+The client PR is merged into dev; changing the client default branch, legacy refs
+or releasing main remains separate work. The node source is maintained
+`F1R3FLY-io/f1r3node-rust`, revision `5dafbc37`; the old-parent ASI Rust-node
+fork and Scala repositories are excluded. No new node build is needed for
+these documentation changes.
+
+See the [infra wallet handoff](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/wallet-cli-pr6.md),
+[client branch audit](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/client-branches.md)
+and [candidate image record](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/wallet-cli-pr6-20261103-8f6c20ea43eb.md)
+for exact source/image evidence. History/export acceptance remains under #5;
+branch selection and green packaging checks do not replace deployment acceptance.
+
+Testnet ECR builds default to remote dev unless the owner explicitly selects
+another source. Freeze its full SHA and preserve the committed client gitlink.
+The [image inventory](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/image-inventory-20261103.md#published-image-sources)
+records the current image built from PR #6 commit `8f6c20ea43eb`; its source tree
+equals the dev merge `3a8f31e`. Later documentation commits do not change that
+runtime or relabel the published artifact.
+
 ## Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) (edition 2024)
@@ -53,10 +99,8 @@ ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain b
 Clone the repository with submodules:
 
 ```bash
-git clone https://github.com/asi-alliance/asi-chain-wallet-cli.git
+git clone --branch dev --recurse-submodules https://github.com/asi-alliance/asi-chain-wallet-cli.git
 cd asi-chain-wallet-cli
-git submodule init
-git submodule update
 ```
 
 The submodule is pinned to the reviewed ASI client commit. Use the recorded gitlink;
