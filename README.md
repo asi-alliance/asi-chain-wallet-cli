@@ -57,7 +57,12 @@ have different roles. Check current PR/ref status before starting new work.
 
 The dependency is the **gitlink**, not a sibling checkout, the fork's default
 branch, or a matching package version. The current wallet integration pins
-[`asi-alliance/asi-chain-client` at `77cbdc8180d8f83a7216dbf54b23268106ea3e91`](https://github.com/asi-alliance/asi-chain-client/commit/77cbdc8180d8f83a7216dbf54b23268106ea3e91).
+[`asi-alliance/asi-chain-client` at `b676e1d053dfdc82d3be10c3f5e76a22e86052b9`](https://github.com/asi-alliance/asi-chain-client/commit/b676e1d053dfdc82d3be10c3f5e76a22e86052b9).
+This candidate includes [client #5](https://github.com/asi-alliance/asi-chain-client/pull/5)
+for [node #896](https://github.com/F1R3FLY-io/f1r3node-rust/pull/896):
+HTTP Int/Uint64 results accept decimal strings and legacy integer numbers.
+The node image and protocol dependency pins remain unchanged. Local HTTP
+fixtures cover the new contract; live upgraded-node acceptance remains separate.
 Use `git submodule update --init --recursive`; do not use `--remote` to substitute
 a moving head. Keep this pin until a separate API/node compatibility review
 accepts a replacement.
