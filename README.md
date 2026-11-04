@@ -80,18 +80,14 @@ or releasing main remains separate work. The node source is maintained
 fork and Scala repositories are excluded. No new node build is needed for
 these documentation changes.
 
-See the [infra wallet handoff](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/wallet-cli-pr6.md),
-[client branch audit](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/client-branches.md)
-and [candidate image record](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/wallet-cli-pr6-20261103-8f6c20ea43eb.md)
-for exact source/image evidence. History/export acceptance remains under #5;
+History/export acceptance remains under
+[issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);
 branch selection and green packaging checks do not replace deployment acceptance.
 
 Testnet ECR builds default to remote dev unless the owner explicitly selects
 another source. Freeze its full SHA and preserve the committed client gitlink.
-The [image inventory](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/image-inventory-20261103.md#published-image-sources)
-records the current image built from PR #6 commit `8f6c20ea43eb`; its source tree
-equals the dev merge `3a8f31e`. Later documentation commits do not change that
-runtime or relabel the published artifact.
+Published images retain their original source identity. A client pin update
+does not rebuild or relabel an existing artifact.
 
 ## Prerequisites
 

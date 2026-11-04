@@ -7,7 +7,7 @@ Read [README.md](README.md), especially [branch status and client dependency](RE
 - Use wallet `dev` for the current ASI client 0.2.9 / Rust-node 0.4.46 integration. Wallet #6 is merged; #3 promotes dev to main and remains open at this snapshot. The repository default `main` still contains the older code pending that promotion; it is a release branch, not deprecated.
 - The merged `fix/asi-client-029-node-046` branch is review/image provenance, not the current development base. The separate `feature/cost-accounted-f1r3node` / #4 requires its own node/client compatibility review and is outside this regular-node integration.
 - Inspect the committed `rust-client` gitlink and `.gitmodules`. The canonical dependency is `asi-alliance/asi-chain-client`; the node #896 compatibility candidate pins `b676e1d053dfdc82d3be10c3f5e76a22e86052b9` from client PR #5. It replaces the earlier dev pin `77cbdc8` for HTTP string-integer decoding; node/protocol pins remain unchanged. Never infer this dependency from a sibling checkout, client package version or branch name. Do not run submodule updates with `--remote` as routine setup.
-- Client #3 merged into its active ASI `dev` as `40f2a94`, preserving runtime `77cbdc8`. The client's GitHub default remains `asi-main` during the transition; client `main`, `asi-main` and `asi-dev` are not substitutes for the tested gitlink. Read the linked infra branch audit before changing the dependency or assuming the normalization is complete.
+- Client #3 merged into its active ASI `dev` as `40f2a94`, preserving runtime `77cbdc8`. The client's GitHub default remains `asi-main` during the transition; client `main`, `asi-main` and `asi-dev` are not substitutes for the tested gitlink. Check the public client PR and exact committed dependency before changing the pin.
 - Preserve ASI native-token metadata, exact raw-dust amounts and current system-vault ABI. Runtime client/node changes need a new exact pin and acceptance evidence; do not replay historical REV URI strings or old API structs blindly.
 
 ## Work and validation
@@ -28,7 +28,7 @@ The integration command starts fresh isolated node state through the owned shard
 
 For documentation-only changes, check links, branch roles, source revisions and whitespace; do not rebuild the node or application just for prose. Keep all published image labels/tags/digests true to their source.
 
-For testnet ECR builds, use remote dev unless the owner explicitly selects another branch/revision/tag/release. Resolve its full SHA and build from clean verified inputs. Keep the committed client gitlink unchanged unless a separate compatibility update is authorized. See the [infra source policy](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/tooling.md#source-branch-policy) and [image inventory](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/image-inventory-20261103.md#published-image-sources).
+For testnet ECR builds, use remote dev unless the owner explicitly selects another branch/revision/tag/release. Resolve its full SHA and build from clean verified inputs. Keep the committed client gitlink unchanged unless a separate compatibility update is authorized. Source compatibility does not authorize image publication or deployment.
 
 ## Command and security contracts
 
