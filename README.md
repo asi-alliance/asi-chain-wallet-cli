@@ -57,7 +57,12 @@ have different roles. Check current PR/ref status before starting new work.
 
 The dependency is the **gitlink**, not a sibling checkout, the fork's default
 branch, or a matching package version. The current wallet integration pins
-[`asi-alliance/asi-chain-client` at `77cbdc8180d8f83a7216dbf54b23268106ea3e91`](https://github.com/asi-alliance/asi-chain-client/commit/77cbdc8180d8f83a7216dbf54b23268106ea3e91).
+[`asi-alliance/asi-chain-client` at `b676e1d053dfdc82d3be10c3f5e76a22e86052b9`](https://github.com/asi-alliance/asi-chain-client/commit/b676e1d053dfdc82d3be10c3f5e76a22e86052b9).
+This candidate includes [client #5](https://github.com/asi-alliance/asi-chain-client/pull/5)
+for [node #896](https://github.com/F1R3FLY-io/f1r3node-rust/pull/896):
+HTTP Int/Uint64 results accept decimal strings and legacy integer numbers.
+The node image and protocol dependency pins remain unchanged. Local HTTP
+fixtures cover the new contract; live upgraded-node acceptance remains separate.
 Use `git submodule update --init --recursive`; do not use `--remote` to substitute
 a moving head. Keep this pin until a separate API/node compatibility review
 accepts a replacement.
@@ -75,18 +80,14 @@ or releasing main remains separate work. The node source is maintained
 fork and Scala repositories are excluded. No new node build is needed for
 these documentation changes.
 
-See the [infra wallet handoff](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/wallet-cli-pr6.md),
-[client branch audit](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/client-branches.md)
-and [candidate image record](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/wallet-cli-pr6-20261103-8f6c20ea43eb.md)
-for exact source/image evidence. History/export acceptance remains under #5;
+History/export acceptance remains under
+[issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);
 branch selection and green packaging checks do not replace deployment acceptance.
 
 Testnet ECR builds default to remote dev unless the owner explicitly selects
 another source. Freeze its full SHA and preserve the committed client gitlink.
-The [image inventory](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/image-inventory-20261103.md#published-image-sources)
-records the current image built from PR #6 commit `8f6c20ea43eb`; its source tree
-equals the dev merge `3a8f31e`. Later documentation commits do not change that
-runtime or relabel the published artifact.
+Published images retain their original source identity. A client pin update
+does not rebuild or relabel an existing artifact.
 
 ## Prerequisites
 
