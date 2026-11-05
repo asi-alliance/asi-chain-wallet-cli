@@ -154,6 +154,17 @@ public URL. Secure WebSocket (`wss`) transport is enabled.
 `DEPLOY_CHECK_INTERVAL_SECONDS` to 5. Both must be positive; the poll interval
 must not exceed the total wait budget.
 
+## Draft admission compatibility
+
+This draft pins ASI client [#6](https://github.com/asi-alliance/asi-chain-client/pull/6)
+commit `62b633ab05bb9d4e54672e8c2db1437264c3437b` for node
+[#789](https://github.com/F1R3FLY-io/f1r3node-rust/pull/789). Explicit
+`deploy_pool_busy` and `deploy_admission_busy` refusals report that the transfer
+was not accepted and can be tried later. Submission/confirmation timeouts keep
+the unknown-outcome warning and the original deploy ID. No automatic new payment
+is created. The historical dev baseline below remains its prior acceptance record;
+this candidate requires its own compatibility checks before merge.
+
 ## Compatibility baseline and tests
 
 This update uses ASI client `77cbdc8180d8f83a7216dbf54b23268106ea3e91`
