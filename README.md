@@ -55,30 +55,21 @@ have different roles. Check current PR/ref status before starting new work.
 | `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
-The dependency is the **gitlink**, not a sibling checkout, the fork's default
-branch, or a matching package version. The current wallet integration pins
-[`asi-alliance/asi-chain-client` at `b676e1d053dfdc82d3be10c3f5e76a22e86052b9`](https://github.com/asi-alliance/asi-chain-client/commit/b676e1d053dfdc82d3be10c3f5e76a22e86052b9).
-This candidate includes [client #5](https://github.com/asi-alliance/asi-chain-client/pull/5)
-for [node #896](https://github.com/F1R3FLY-io/f1r3node-rust/pull/896):
-HTTP Int/Uint64 results accept decimal strings and legacy integer numbers.
-The node image and protocol dependency pins remain unchanged. Local HTTP
-fixtures cover the new contract; live upgraded-node acceptance remains separate.
-Use `git submodule update --init --recursive`; do not use `--remote` to substitute
-a moving head. Keep this pin until a separate API/node compatibility review
-accepts a replacement.
+The client submodule uses [asi-alliance/asi-chain-client, branch `rust-dev`](https://github.com/asi-alliance/asi-chain-client/tree/rust-dev),
+pinned to `5d1c9b4d12e33ec8b64a74a28df196ef03478e73` (verified on 2026-11-11).
+Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
+The library preserves ASI metadata, exact raw-dust amounts and the
+`rho:vault:system` transfer ABI; its CLI remains disabled.
+Send reads the validator's minimum Phlo price before signing and checks its
+symbol/shard. This client accepts prices in the positive `i64` range and encodes
+them as 32-byte uint256 protobuf values. Larger prices fail before signing.
+HTTP integer responses support both numeric and string encodings.
 
-| Client repository branch | Current status |
-|---|---|
-| `dev` | Active ASI integration branch after [client #3](https://github.com/asi-alliance/asi-chain-client/pull/3) merged as `40f2a94`. It contains the tested runtime `77cbdc8`; keep using the wallet's exact gitlink rather than moving dev. |
-| `main` | Currently matches upstream release v0.2.9. It is not the tested ASI integration commit simply because its version is 0.2.9. Future ASI release promotion is separate. |
-| `asi-main` | Historical ASI 0.1.1 line; still the GitHub default during the transition. It is not the current wallet dependency. |
-| `asi-dev` | Older separate ASI line, with a unique OpenSSL/target-configuration commit; not the selected wallet baseline. |
-
-The client PR is merged into dev; changing the client default branch, legacy refs
-or releasing main remains separate work. The node source is maintained
-`F1R3FLY-io/f1r3node-rust`, revision `5dafbc37`; the old-parent ASI Rust-node
-fork and Scala repositories are excluded. No new node build is needed for
-these documentation changes.
+The `.gitmodules` branch setting records the selected development branch;
+the exact gitlink determines the client used by builds. Use
+`git submodule sync -- rust-client` after the URL change, followed by
+`git submodule update --init --recursive`, never `--remote` for reproducible builds.
+A compatible published node image is still required for live acceptance.
 
 History/export acceptance remains under
 [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);
@@ -104,7 +95,7 @@ git clone --branch dev --recurse-submodules https://github.com/asi-alliance/asi-
 cd asi-chain-wallet-cli
 ```
 
-The submodule is pinned to the reviewed ASI client commit. Use the recorded gitlink;
+The submodule uses the exact client commit documented above. Use that gitlink;
 do not use `--remote` to replace it with a moving branch:
 ```bash
 git submodule update --init --recursive
@@ -157,23 +148,31 @@ must not exceed the total wait budget.
 
 ## Compatibility baseline and tests
 
-This update uses ASI client `77cbdc8180d8f83a7216dbf54b23268106ea3e91`
-from [client PR #3](https://github.com/asi-alliance/asi-chain-client/pull/3),
-`node_cli 0.2.9`, with CLI dependencies disabled. All node protocol crates
-are pinned there to `f1r3node-rust` source
-`5dafbc37dad3ebf3da810641fc0d8cecd5a1127b`. The root Cargo.lock and
-`nightly-2026-02-09` pin dependency resolution and compiler selection.
+The candidate uses the exact client/node pins above, the root Cargo.lock and
+`nightly-2026-02-09`. Registry dependency versions are unchanged. Run existing
+checks with `CARGO_BUILD_JOBS=2`:
 
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --features integration --locked -- -D warnings
 cargo test --release --locked
 cargo build --release --locked
+FIREFLY_NODE_IMAGE=public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df \
 cargo test --release --features integration --test node_compatibility --locked
 ```
 
+**Live acceptance gap:** the unchanged workflow/topology pins the image below
+from node source `5dafbc37`, which predates #881 and cannot validate this client.
+The existing node CI job remains enabled; it is expected to fail until a compatible
+published immutable image with verified source provenance is accepted separately.
+Client #88 records candidate digest
+`f1r3flyindustries/f1r3fly-rust@sha256:4eab74400b569aff7718d63b5551e97a2df6e568ff4799bce4366ac8545f7646`,
+but local labels/`--version` did not independently verify its source revision.
+No image is replaced or rebuilt here, and no live wallet acceptance is claimed.
+
 The last command requires Docker and creates its own shard with fresh test
-keys/state. It uses the existing immutable linux/amd64 image:
+keys/state. Set the image explicitly as above: the upstream helper has a different
+default. The owner-selected immutable linux/amd64 image remains:
 
 ```text
 public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df

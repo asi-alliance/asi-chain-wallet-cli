@@ -1,6 +1,6 @@
-use crate::balance::{get_balance, metadata};
+use crate::balance::{get_balance, metadata, metadata_at};
 use crate::config::Config;
-use anyhow::{Result, anyhow, ensure};
+use anyhow::{Context, Result, anyhow, ensure};
 use node_cli::{ConnectionConfig, DeployOptions, F1r3flyConnectionManager, SigningKey};
 use num_bigint::BigUint;
 
@@ -33,6 +33,7 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     let config = Config::from_env()?;
     let wallet = config.get_wallet()?;
     let token = metadata(&config).await?;
+    let validator = metadata_at(&config, &config.validator_http).await?;
     let balance = get_balance(&config, &wallet.address).await?;
     ensure!(
         balance.dust >= amount,
@@ -52,6 +53,11 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     let term = node_cli::vault::build_transfer_rholang(&wallet.address, to, &amount)?;
     let mut options =
         DeployOptions::default().with_phlo_limit(node_cli::vault::TRANSFER_PHLO_LIMIT);
+    options.phlo_price = validator
+        .min_phlo_price
+        .max(1.into())
+        .try_into()
+        .context("Validator minimum Phlo price exceeds the client i64 range")?;
     options.expiration = Some(chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000);
     let signed = manager
         .api()
