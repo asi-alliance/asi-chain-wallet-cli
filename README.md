@@ -69,7 +69,16 @@ The `.gitmodules` branch setting records the selected development branch;
 the exact gitlink determines the client used by builds. Use
 `git submodule sync -- rust-client` after the URL change, followed by
 `git submodule update --init --recursive`, never `--remote` for reproducible builds.
-A compatible published node image is still required for live acceptance.
+The integration image is built from upstream `F1R3FLY-io/f1r3node-rust` dev at
+`49ce9074bc5aafef24ab5c25bfdd60685d64d464`, selected on 2026-11-11.
+The workflow and test topology pin
+`amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab`
+(published tag `dev-49ce9074bc5a`). The previous
+image used the old monetary protobuf and rejected this client's signatures.
+Local acceptance passed on the new dev image: 7 unit tests, 2 HTTP tests,
+and the full node scenario (197.13 seconds). The local scenario used free
+`414xx` host ports to avoid the existing network; CI retains its isolated
+`404xx` port mapping. No test assertions were removed.
 
 History/export acceptance remains under
 [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);

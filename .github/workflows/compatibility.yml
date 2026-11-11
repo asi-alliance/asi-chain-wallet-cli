@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      FIREFLY_NODE_IMAGE: public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df
+      FIREFLY_NODE_IMAGE: amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab
     steps:
       - uses: actions/checkout@v4
         with:
