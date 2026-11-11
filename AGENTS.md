@@ -6,15 +6,14 @@ Read [README.md](README.md), especially [branch status and client dependency](RE
 
 - Use wallet `dev` for the current ASI client 0.2.9 / Rust-node 0.4.46 integration. Wallet #6 is merged; #3 promotes dev to main and remains open at this snapshot. The repository default `main` still contains the older code pending that promotion; it is a release branch, not deprecated.
 - The merged `fix/asi-client-029-node-046` branch is review/image provenance, not the current development base. The separate `feature/cost-accounted-f1r3node` / #4 requires its own node/client compatibility review and is outside this regular-node integration.
-- Inspect the committed `rust-client` gitlink and `.gitmodules`. The canonical dependency is `asi-alliance/asi-chain-client`; the tested wallet pin is `77cbdc8180d8f83a7216dbf54b23268106ea3e91`. Never infer this dependency from a sibling checkout, client package version or branch name. Do not run submodule updates with `--remote` as routine setup.
-- Client #3 merged into its active ASI `dev` as `40f2a94`, preserving runtime `77cbdc8`. The client's GitHub default remains `asi-main` during the transition; client `main`, `asi-main` and `asi-dev` are not substitutes for the tested gitlink. Read the linked infra branch audit before changing the dependency or assuming the normalization is complete.
+- The client submodule uses `asi-alliance/asi-chain-client`, branch `rust-dev`, pinned to `5d1c9b4d12e33ec8b64a74a28df196ef03478e73` (2026-11-11), with node protocol crates at `0ccc315d84b32d668e8db49cd56ba3c576693e15`. It preserves the wallet's ASI metadata/vault ABI. Phlo prices must fit positive `i64` and are encoded as uint256 protobuf values; HTTP integers accept numeric and string encodings. Use the exact gitlink, never a sibling checkout or `--remote`.
 - Preserve ASI native-token metadata, exact raw-dust amounts and current system-vault ABI. Runtime client/node changes need a new exact pin and acceptance evidence; do not replay historical REV URI strings or old API structs blindly.
 
 ## Work and validation
 
 Check `git status --short --branch` before edits. Read `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.github/workflows/compatibility.yml` and the selected source revision. Preserve unrelated local changes. If a checkout differs from the expected branch, compare files with the published revision before any alignment. Follow applicable workspace/owner Git permissions; this file grants no staging, commit, push, branch-change or merge permission.
 
-Use the pinned toolchain and run checks appropriate to runtime changes:
+Use the pinned toolchain, at most two build jobs (`CARGO_BUILD_JOBS=2`), and existing checks appropriate to runtime changes:
 
 ```bash
 cargo fmt --check
@@ -23,6 +22,8 @@ cargo test --release --locked
 cargo build --release --locked
 cargo test --release --features integration --test node_compatibility --locked -- --nocapture
 ```
+
+The unchanged integration image predates #881 and cannot validate this client; live acceptance is blocked pending a separately verified compatible published image. Keep the node CI job enabled and report failures honestly. Do not replace/rebuild images as part of this review.
 
 The integration command starts fresh isolated node state through the owned shard harness; inspect its ownership checks and do not stop an existing network or reuse real keys. Use the exact existing node-image digest in the workflow/topology. Further node builds are paused by the owner. The active source is `F1R3FLY-io/f1r3node-rust`; deprecated combined-parent and Scala sources are excluded.
 

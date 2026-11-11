@@ -201,7 +201,7 @@ fn wallet_balance_transfer_rejection_and_timeout() {
         &[
             "send",
             "--to",
-            &keys::ASI_TRANSFER_RECIPIENT.address,
+            &keys::TRANSFER_RECIPIENT.address,
             "--amount",
             "0",
         ],
@@ -209,14 +209,14 @@ fn wallet_balance_transfer_rejection_and_timeout() {
     );
     assert!(!zero.status.success());
     assert!(!text(&zero).contains("Deploy ID:"));
-    let before = balance(&keys::ASI_TRANSFER_RECIPIENT);
+    let before = balance(&keys::TRANSFER_RECIPIENT);
     let amount = "9007199254740993";
     let sent = wallet(
         &keys::TRANSFER_SENDER,
         &[
             "send",
             "--to",
-            &keys::ASI_TRANSFER_RECIPIENT.address,
+            &keys::TRANSFER_RECIPIENT.address,
             "--amount",
             amount,
         ],
@@ -226,7 +226,7 @@ fn wallet_balance_transfer_rejection_and_timeout() {
     assert!(text(&sent).contains("Transfer complete."));
     observed(&deploy_id(&sent));
     assert_eq!(
-        balance(&keys::ASI_TRANSFER_RECIPIENT) - before,
+        balance(&keys::TRANSFER_RECIPIENT) - before,
         amount.parse::<BigUint>().unwrap()
     );
     let before = balance(&keys::IDLE_RECIPIENT);
@@ -257,7 +257,7 @@ fn wallet_balance_transfer_rejection_and_timeout() {
         &["send", "--to", &keys::SPARE.address, "--amount", "1"],
         &[
             ("OBSERVER_HTTP_URL", &pending.url),
-            ("VALIDATOR_HTTP_URL", "http://127.0.0.1:1"),
+            ("VALIDATOR_HTTP_URL", &pending.url),
             ("DEPLOY_MAX_WAIT_SECONDS", "1"),
             ("DEPLOY_CHECK_INTERVAL_SECONDS", "1"),
         ],
