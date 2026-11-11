@@ -23,13 +23,13 @@ cargo build --release --locked
 cargo test --release --features integration --test node_compatibility --locked -- --nocapture
 ```
 
-The unchanged integration image predates #881 and cannot validate this client; live acceptance is blocked pending a separately verified compatible published image. Keep the node CI job enabled and report failures honestly. Do not replace/rebuild images as part of this review.
+The owner authorized a new integration image from upstream `F1R3FLY-io/f1r3node-rust` dev at `49ce9074bc5aafef24ab5c25bfdd60685d64d464` on 2026-11-11. The workflow and topology must pin the same published digest. The former image at `e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df` uses the old monetary protobuf and rejects this client's signatures. Keep the node CI job enabled and report failures honestly. Further source/image changes require a new compatibility review.
 
-The integration command starts fresh isolated node state through the owned shard harness; inspect its ownership checks and do not stop an existing network or reuse real keys. Use the exact existing node-image digest in the workflow/topology. Further node builds are paused by the owner. The active source is `F1R3FLY-io/f1r3node-rust`; deprecated combined-parent and Scala sources are excluded.
+The integration command starts fresh isolated node state through the owned shard harness; inspect its ownership checks and do not stop an existing network or reuse real keys. Use the exact selected node-image digest in the workflow/topology. The owner authorized this dev image rebuild for the CI correction. The active source is `F1R3FLY-io/f1r3node-rust`; deprecated combined-parent and Scala sources are excluded.
 
 For documentation-only changes, check links, branch roles, source revisions and whitespace; do not rebuild the node or application just for prose. Keep all published image labels/tags/digests true to their source.
 
-For testnet ECR builds, use remote dev unless the owner explicitly selects another branch/revision/tag/release. Resolve its full SHA and build from clean verified inputs. Keep the committed client gitlink unchanged unless a separate compatibility update is authorized. See the [infra source policy](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/tooling.md#source-branch-policy) and [image inventory](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/image-inventory-20261103.md#published-image-sources).
+For testnet ECR builds, use remote dev unless the owner explicitly selects another branch/revision/tag/release. Resolve its full SHA and build from clean verified inputs. Keep the committed client gitlink unchanged unless a separate compatibility update is authorized. Source compatibility does not authorize image publication or deployment.
 
 ## Command and security contracts
 

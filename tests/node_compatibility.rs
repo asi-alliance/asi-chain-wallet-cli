@@ -1,4 +1,4 @@
-//! Real wallet commands against the existing immutable ASI node image.
+//! Real wallet commands against the pinned uint256-compatible dev node image.
 #[path = "support/mod.rs"]
 mod common;
 
