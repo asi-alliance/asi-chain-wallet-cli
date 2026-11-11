@@ -6,7 +6,7 @@ Read [README.md](README.md), especially [branch status and client dependency](RE
 
 - Use wallet `dev` for the current ASI client 0.2.9 / Rust-node 0.4.46 integration. Wallet #6 is merged; #3 promotes dev to main and remains open at this snapshot. The repository default `main` still contains the older code pending that promotion; it is a release branch, not deprecated.
 - The merged `fix/asi-client-029-node-046` branch is review/image provenance, not the current development base. The separate `feature/cost-accounted-f1r3node` / #4 requires its own node/client compatibility review and is outside this regular-node integration.
-- The client submodule uses `asi-alliance/asi-chain-client`, branch `rust-dev`, pinned to `5d1c9b4d12e33ec8b64a74a28df196ef03478e73` (2026-11-11), with node protocol crates at `0ccc315d84b32d668e8db49cd56ba3c576693e15`. It preserves the wallet's ASI metadata/vault ABI. Phlo prices must fit positive `i64` and are encoded as uint256 protobuf values; HTTP integers accept numeric and string encodings. Use the exact gitlink, never a sibling checkout or `--remote`.
+- The Cargo git dependency uses `asi-alliance/asi-chain-client`, branch `rust-dev`, pinned to `5d1c9b4d12e33ec8b64a74a28df196ef03478e73` (2026-11-11), with node protocol crates at `0ccc315d84b32d668e8db49cd56ba3c576693e15`. It preserves the wallet's ASI metadata/vault ABI. Phlo prices must fit positive `i64` and are encoded as uint256 protobuf values; HTTP integers accept numeric and string encodings. Keep the exact `rev` in `Cargo.toml` and the matching Git source in `Cargo.lock`; do not use a sibling checkout or a floating branch.
 - Preserve ASI native-token metadata, exact raw-dust amounts and current system-vault ABI. Runtime client/node changes need a new exact pin and acceptance evidence; do not replay historical REV URI strings or old API structs blindly.
 
 ## Work and validation
@@ -29,7 +29,7 @@ The integration command starts fresh isolated node state through the owned shard
 
 For documentation-only changes, check links, branch roles, source revisions and whitespace; do not rebuild the node or application just for prose. Keep all published image labels/tags/digests true to their source.
 
-For testnet ECR builds, use remote dev unless the owner explicitly selects another branch/revision/tag/release. Resolve its full SHA and build from clean verified inputs. Keep the committed client gitlink unchanged unless a separate compatibility update is authorized. Source compatibility does not authorize image publication or deployment.
+For testnet ECR builds, use remote dev unless the owner explicitly selects another branch/revision/tag/release. Resolve its full SHA and build from clean verified inputs. Keep the committed client revision unchanged unless a separate compatibility update is authorized. Source compatibility does not authorize image publication or deployment.
 
 ## Command and security contracts
 

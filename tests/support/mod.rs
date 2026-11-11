@@ -1,14 +1,11 @@
-#[rustfmt::skip]
+//! Fixture helpers copied from asi-alliance/asi-chain-client at
+//! 5d1c9b4d12e33ec8b64a74a28df196ef03478e73 under Apache-2.0.
+
 #[allow(dead_code)]
-#[path = "../../rust-client/tests/integration/common/keys.rs"]
 pub mod keys;
-#[rustfmt::skip]
 #[allow(dead_code)]
-#[path = "../../rust-client/tests/integration/common/node.rs"]
 pub mod node;
-#[rustfmt::skip]
 #[allow(dead_code)]
-#[path = "../../rust-client/tests/integration/common/shard.rs"]
 pub mod shard;
 
 pub fn rt() -> &'static tokio::runtime::Runtime {

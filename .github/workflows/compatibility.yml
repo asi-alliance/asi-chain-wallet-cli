@@ -16,7 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -39,7 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@nightly
         with:
