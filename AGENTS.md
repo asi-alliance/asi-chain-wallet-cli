@@ -1,12 +1,12 @@
 # Wallet CLI agent guidance
 
-Read [README.md](README.md), especially [branch status and client dependency](README.md#branch-status-and-client-dependency), before work. Recheck current refs/PRs: the recorded branch snapshot is dated 2026-11-03.
+Read [README.md](README.md), especially [branch status and client dependency](README.md#branch-status-and-client-dependency), before work. Recheck the current refs and PR status.
 
 ## Branch and dependency selection
 
-- Use wallet `dev` for the current ASI client 0.2.9 / Rust-node 0.4.46 integration. Wallet #6 is merged; #3 promotes dev to main and remains open at this snapshot. The repository default `main` still contains the older code pending that promotion; it is a release branch, not deprecated.
+- Use wallet `dev` for current development. Wallet [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6) introduced the typed client integration. Wallet [#3](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/3) promotes `dev` to the default release branch, `main`.
 - The merged `fix/asi-client-029-node-046` branch is review/image provenance, not the current development base. The separate `feature/cost-accounted-f1r3node` / #4 requires its own node/client compatibility review and is outside this regular-node integration.
-- The Cargo git dependency uses `asi-alliance/asi-chain-client`, branch `rust-dev`, pinned to `5d1c9b4d12e33ec8b64a74a28df196ef03478e73` (2026-11-11), with node protocol crates at `0ccc315d84b32d668e8db49cd56ba3c576693e15`. It preserves the wallet's ASI metadata/vault ABI. Phlo prices must fit positive `i64` and are encoded as uint256 protobuf values; HTTP integers accept numeric and string encodings. Keep the exact `rev` in `Cargo.toml` and the matching Git source in `Cargo.lock`; do not use a sibling checkout or a floating branch.
+- The Cargo Git dependency uses ASI client 0.3.0 from `asi-alliance/asi-chain-client` at `9292f5433b4d727d9a226f2f5766dfd088e14948`, with node protocol crates at `0ccc315d84b32d668e8db49cd56ba3c576693e15`. Preserve the ASI metadata/vault ABI and carry positive uint256 Phlo prices into signing as `BigUint`. Keep the exact `rev` in `Cargo.toml` and the matching Git source in `Cargo.lock`.
 - Preserve ASI native-token metadata, exact raw-dust amounts and current system-vault ABI. Runtime client/node changes need a new exact pin and acceptance evidence; do not replay historical REV URI strings or old API structs blindly.
 
 ## Work and validation
