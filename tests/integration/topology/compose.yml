@@ -153,6 +153,20 @@ services:
       - ${IT_SHARD_DIR}/genesis/bonds.txt:/var/lib/f1r3fly/genesis/bonds.txt:ro
       - ${IT_SHARD_DIR}/genesis/wallets.txt:/var/lib/f1r3fly/genesis/wallets.txt:ro
 
+  # Tip reads reach validator1 over gRPC. The closed HTTP event link makes the
+  # queue return its real admission refusal when the wallet submits the deploy.
+  disconnected-queue:
+    image: public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:65e732bfaf26025a94216c529da8baad2049b4b561ffe0d44c3a547f0f3834c8
+    entrypoint: ["/opt/docker/bin/deploy-queue"]
+    command:
+      - --node-grpc=http://validator1:40402
+      - --node-http=http://127.0.0.1:1
+      - --data-dir=/tmp/queue
+    networks: [shard]
+    depends_on: [validator1]
+    ports:
+      - "127.0.0.1:40414:40401"
+
   # Unbonded at genesis; started by the bonding tests.
   validator4:
     <<: *node

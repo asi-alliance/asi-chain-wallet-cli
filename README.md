@@ -180,7 +180,11 @@ created shard is torn down. No node build or existing genesis change is performe
 
 See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
 The wallet command test checks exact balances/transfers, vault rejection and
-an intentionally withheld finalization verdict. Full history/export acceptance
+an intentionally withheld finalization verdict. A separate deploy queue forwards
+gRPC tip reads to the validator while its HTTP event link is disconnected.
+The test submits a signed transfer through that queue and checks the CLI's exit
+status, original deploy ID, refusal reason, retry guidance and recipient balance.
+Full history/export acceptance
 against the deployed Hasura schema remains a separate staging requirement.
 
 ## Commands
