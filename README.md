@@ -54,8 +54,9 @@ Check current PR status and branch revisions before starting new work.
 | `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
-The Cargo Git dependency uses ASI client 0.3.0 pinned to
-[`9292f5433b4d727d9a226f2f5766dfd088e14948`](https://github.com/asi-alliance/asi-chain-client/commit/9292f5433b4d727d9a226f2f5766dfd088e14948).
+The Cargo Git dependency pins `F1R3FLY-io/rust-client` at
+`e8620a46572dbc2ec53c81f4389f5abf5c02f0b0` from branch
+`fix/node-789-admission-refusals`. [Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86)
 Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
@@ -144,6 +145,16 @@ public URL. Secure WebSocket (`wss`) transport is enabled.
 `DEPLOY_CHECK_INTERVAL_SECONDS` to 5. Both must be positive; the poll interval
 must not exceed the total wait budget.
 
+## Deploy admission refusals
+
+The client reports explicit refusals from node admission and from the deploy queue.
+The CLI shows the original deploy ID and offers retry guidance for retryable
+refusals. A rejection after queue admission is a terminal transfer failure.
+Submission and confirmation timeouts keep the unknown-outcome warning and direct
+the operator to check the original deploy ID before creating another payment.
+[Node admission PR #789](https://github.com/F1R3FLY-io/f1r3node-rust/pull/789),
+[deploy queue PR #990](https://github.com/F1R3FLY-io/f1r3node-rust/pull/990)
+
 ## Compatibility baseline and tests
 
 The candidate uses the exact client/node pins above, the root Cargo.lock and
@@ -169,7 +180,11 @@ created shard is torn down. No node build or existing genesis change is performe
 
 See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
 The wallet command test checks exact balances/transfers, vault rejection and
-an intentionally withheld finalization verdict. Full history/export acceptance
+an intentionally withheld finalization verdict. A separate deploy queue forwards
+gRPC tip reads to the validator while its HTTP event link is disconnected.
+The test submits a signed transfer through that queue and checks the CLI's exit
+status, original deploy ID, refusal reason, retry guidance and recipient balance.
+Full history/export acceptance
 against the deployed Hasura schema remains a separate staging requirement.
 
 ## Commands

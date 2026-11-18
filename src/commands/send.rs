@@ -24,8 +24,15 @@ fn transfer_deploy_options(min_phlo_price: BigUint, expiration: i64) -> DeployOp
 
 fn send_error(id: &str, error: node_cli::Error) -> anyhow::Error {
     match error {
+        node_cli::Error::DeployAdmissionRefused { reason, .. } if reason.is_retryable() => {
+            anyhow!("Transfer not accepted for deploy {id}: {error}. Please try again later.")
+        }
+        node_cli::Error::DeployAdmissionRefused { .. } => {
+            anyhow!("Transfer not accepted for deploy {id}: {error}")
+        }
         node_cli::Error::DeployFailed { .. }
         | node_cli::Error::DeployExpired { .. }
+        | node_cli::Error::DeployRejected { .. }
         | node_cli::Error::NodeRejected { .. }
         | node_cli::Error::ContractRejected { .. } => {
             anyhow!("Transfer failed for deploy {id}: {error}")
@@ -137,6 +144,45 @@ mod tests {
         );
         assert!(err.to_string().contains("outcome unknown"));
         assert!(err.to_string().contains("original-id"));
+    }
+    #[test]
+    fn admission_refusals_are_distinct_from_unknown_outcomes() {
+        for (reason, retryable) in [
+            (node_cli::DeployAdmissionReason::PoolBusy, true),
+            (node_cli::DeployAdmissionReason::AdmissionBusy, true),
+            (node_cli::DeployAdmissionReason::TooLarge, false),
+        ] {
+            let err = send_error(
+                "original-id",
+                node_cli::Error::DeployAdmissionRefused {
+                    deploy_id: "original-id".into(),
+                    reason,
+                    message: "busy".into(),
+                    retry_after: None,
+                    congestion: None,
+                },
+            );
+            let message = err.to_string();
+            assert!(message.contains("not accepted"));
+            assert!(message.contains("original-id"));
+            assert!(message.contains(reason.code()));
+            assert_eq!(message.contains("Please try again later"), retryable);
+            assert!(!message.contains("outcome unknown"));
+        }
+    }
+    #[test]
+    fn a_rejection_after_queue_admission_is_a_terminal_failure() {
+        let detail = "term could not be compiled";
+        let err = send_error(
+            "original-id",
+            node_cli::Error::DeployRejected {
+                deploy_id: "original-id".into(),
+                detail: Some(detail.into()),
+            },
+        );
+        let message = err.to_string();
+        assert!(message.starts_with("Transfer failed for deploy original-id:"));
+        assert!(message.contains(detail));
     }
     #[test]
     fn a_contract_rejection_is_never_a_success() {
