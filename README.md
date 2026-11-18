@@ -61,9 +61,10 @@ The Cargo git dependency pins `F1R3FLY-io/rust-client` at
 Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
-Send reads the validator's minimum Phlo price before signing and checks its
-symbol/shard. This client accepts prices in the positive `i64` range and encodes
-them as 32-byte uint256 protobuf values. Larger prices fail before signing.
+Send reads the validator's minimum Phlo price before signing and checks the
+validator's token symbol and shard. The client encodes the price as a 32-byte
+uint256 protobuf value and checks that the price times the transfer Phlo limit
+fits uint256 before signing.
 HTTP integer responses support both numeric and string encodings.
 
 `Cargo.toml` selects this exact commit with `rev`, and `Cargo.lock`

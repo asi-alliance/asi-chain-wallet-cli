@@ -13,6 +13,15 @@ fn transfer_amount(value: &str) -> Result<BigUint> {
     Ok(node_cli::vault::parse_amount(significant)?)
 }
 
+fn transfer_deploy_options(min_phlo_price: BigUint, expiration: i64) -> DeployOptions {
+    DeployOptions {
+        phlo_limit: node_cli::vault::TRANSFER_PHLO_LIMIT,
+        phlo_price: min_phlo_price.max(1u8.into()),
+        expiration: Some(expiration),
+        ..DeployOptions::default()
+    }
+}
+
 fn send_error(id: &str, error: node_cli::Error) -> anyhow::Error {
     match error {
         node_cli::Error::DeployAdmissionRefused { reason, .. } if reason.is_retryable() => {
@@ -58,14 +67,10 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     connection.poll_interval_secs = config.check_interval;
     let manager = F1r3flyConnectionManager::new(connection)?;
     let term = node_cli::vault::build_transfer_rholang(&wallet.address, to, &amount)?;
-    let mut options =
-        DeployOptions::default().with_phlo_limit(node_cli::vault::TRANSFER_PHLO_LIMIT);
-    options.phlo_price = validator.min_phlo_price.max(1u8.into());
-    ensure!(
-        options.phlo_price <= BigUint::from(i64::MAX as u64),
-        "Validator minimum Phlo price exceeds the client i64 range"
+    let options = transfer_deploy_options(
+        validator.min_phlo_price,
+        chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000,
     );
-    options.expiration = Some(chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000);
     let signed = manager
         .api()
         .prepare(&term, &options)
@@ -121,6 +126,13 @@ mod tests {
         }
     }
     #[test]
+    fn accepts_a_validator_phlo_price_of_two_to_the_63() {
+        let price = BigUint::from(1u64 << 63);
+        let options = transfer_deploy_options(price.clone(), 1);
+        assert_eq!(options.phlo_price, price);
+        node_cli::UnsignedDeploy::new("Nil", &options, 1, "root").unwrap();
+    }
+    #[test]
     fn a_timeout_is_an_error_with_the_original_deploy_id() {
         let err = send_error(
             "original-id",
@@ -157,6 +169,20 @@ mod tests {
             assert_eq!(message.contains("Please try again later"), retryable);
             assert!(!message.contains("outcome unknown"));
         }
+    }
+    #[test]
+    fn a_rejection_after_queue_admission_is_a_terminal_failure() {
+        let detail = "term could not be compiled";
+        let err = send_error(
+            "original-id",
+            node_cli::Error::DeployRejected {
+                deploy_id: "original-id".into(),
+                detail: Some(detail.into()),
+            },
+        );
+        let message = err.to_string();
+        assert!(message.starts_with("Transfer failed for deploy original-id:"));
+        assert!(message.contains(detail));
     }
     #[test]
     fn a_contract_rejection_is_never_a_success() {
