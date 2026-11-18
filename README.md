@@ -279,11 +279,14 @@ docker build -t wallet-cli .
 
 ### Run with Docker Compose 
 
-Run commands:
+On Linux, create the bind-mounted directories as the account that owns the
+wallet files. Run the CLI with that account's UID and GID so it can save the
+wallet and write exports. The image defaults to UID and GID 10001.
 
 ```bash
-docker compose run --rm wallet-cli balance
-docker compose run --rm wallet-cli send --to <ADDRESS> --amount 1000
+(umask 077 && mkdir -p credentials exports)
+docker compose run --rm --user "$(id -u):$(id -g)" wallet-cli balance
+docker compose run --rm --user "$(id -u):$(id -g)" wallet-cli send --to <ADDRESS> --amount 1000
 ```
 
 ## Token Decimals

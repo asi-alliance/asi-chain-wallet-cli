@@ -29,6 +29,20 @@ jobs:
       - run: cargo clippy --all-targets --features integration --locked -- -D warnings
       - run: cargo test --release --locked
       - run: cargo build --release --locked
+      - name: Build the node compatibility test
+        shell: bash
+        run: |
+          test_bin=$(cargo test --release --features integration --test node_compatibility --locked --no-run --message-format=json |
+            jq -r 'select(.reason == "compiler-artifact" and .target.name == "node_compatibility" and .executable != null) | .executable')
+          cp "$test_bin" target/release/node-compatibility-test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wallet-compatibility-binaries
+          path: |
+            target/release/asi-chain-wallet-cli
+            target/release/node-compatibility-test
+          if-no-files-found: error
+          retention-days: 1
   node-compatibility:
     needs: check
     runs-on: ubuntu-24.04
@@ -39,14 +53,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: nightly-2026-02-09
-      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libssl-dev pkg-config cmake libclang-dev
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: wallet-client-029
-      - run: cargo test --release --features integration --test node_compatibility --locked -- --nocapture
+          name: wallet-compatibility-binaries
+          path: target/release
+      - name: Run the node compatibility test
+        run: |
+          chmod +x target/release/asi-chain-wallet-cli target/release/node-compatibility-test
+          target/release/node-compatibility-test --nocapture
       - name: Tear down the owned shard
         if: always()
         run: |
