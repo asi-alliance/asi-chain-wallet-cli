@@ -29,7 +29,7 @@ pub enum Commands {
         to: String,
 
         #[arg(short, long)]
-        amount: u64,
+        amount: String,
     },
 
     #[command(visible_alias = "hist")]
@@ -73,7 +73,7 @@ async fn main() {
     let result = match &cli.command {
         Some(Commands::Create { save }) => handle_create_wallet(*save),
         Some(Commands::Balance {}) => handle_get_balance().await,
-        Some(Commands::Send { to, amount }) => handle_send(to, *amount).await,
+        Some(Commands::Send { to, amount }) => handle_send(to, amount).await,
         Some(Commands::History { limit }) => handle_get_history(&config, *limit).await,
         Some(Commands::Export {
             format,

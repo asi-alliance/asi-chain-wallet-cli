@@ -12,6 +12,10 @@ use std::collections::HashSet;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
 pub async fn handle_get_history(config: &Config, limit: Option<u32>) -> Result<()> {
+    anyhow::ensure!(
+        !config.graphql_url.trim().is_empty(),
+        "GRAPHQL_URL is required for history/export"
+    );
     let wallet = config.get_wallet()?;
     let limit = limit.unwrap_or(10);
 
@@ -50,53 +54,49 @@ async fn subscribe_deployments(
     let mut last_timestamp = chrono::Utc::now().to_rfc3339();
 
     while let Some(msg) = read.next().await {
-        if let Ok(Message::Text(text)) = msg {
-            if let Ok(response) = serde_json::from_str::<serde_json::Value>(&text) {
-                let msg_type = response.get("type").and_then(|v| v.as_str());
-                let msg_id = response.get("id").and_then(|v| v.as_str());
+        if let Ok(Message::Text(text)) = msg
+            && let Ok(response) = serde_json::from_str::<serde_json::Value>(&text)
+        {
+            let msg_type = response.get("type").and_then(|v| v.as_str());
+            let msg_id = response.get("id").and_then(|v| v.as_str());
 
-                if msg_id == Some("init") {
-                    match msg_type {
-                        Some("data") => {
-                            if let Some(payload) = response.get("payload") {
-                                if let Some(data) = payload.get("data") {
-                                    if let Some(deployments_data) = data.get("deployments") {
-                                        if let Ok(mut deployments) =
-                                            serde_json::from_value::<Vec<serde_json::Value>>(
-                                                deployments_data.clone(),
-                                            )
-                                        {
-                                            deployments.reverse();
+            if msg_id == Some("init") {
+                match msg_type {
+                    Some("data") => {
+                        if let Some(payload) = response.get("payload")
+                            && let Some(data) = payload.get("data")
+                            && let Some(deployments_data) = data.get("deployments")
+                            && let Ok(mut deployments) =
+                                serde_json::from_value::<Vec<serde_json::Value>>(
+                                    deployments_data.clone(),
+                                )
+                        {
+                            deployments.reverse();
 
-                                            println!("{}", "=".repeat(80));
-                                            println!("\nRecent History (last {}):\n", limit);
+                            println!("{}", "=".repeat(80));
+                            println!("\nRecent History (last {}):\n", limit);
 
-                                            for deployment in &deployments {
-                                                display_deployment(deployment, address);
+                            for deployment in &deployments {
+                                display_deployment(deployment, address);
 
-                                                if let Some(created) = deployment
-                                                    .get("created_at")
-                                                    .and_then(|v| v.as_str())
-                                                {
-                                                    last_timestamp = created.to_string();
-                                                }
-                                            }
-
-                                            if deployments.is_empty() {
-                                                println!("No recent deployments found");
-                                            }
-                                        }
-                                    }
+                                if let Some(created) =
+                                    deployment.get("created_at").and_then(|v| v.as_str())
+                                {
+                                    last_timestamp = created.to_string();
                                 }
                             }
+
+                            if deployments.is_empty() {
+                                println!("No recent deployments found");
+                            }
                         }
-                        Some("complete") => {
-                            initial_received = true;
-                            println!("\n>>> Monitoring for new deployments...");
-                            break;
-                        }
-                        _ => {}
                     }
+                    Some("complete") => {
+                        initial_received = true;
+                        println!("\n>>> Monitoring for new deployments...");
+                        break;
+                    }
+                    _ => {}
                 }
             }
         }
@@ -128,27 +128,23 @@ async fn subscribe_deployments(
                     if msg_id == Some("1") {
                         match msg_type {
                             Some("data") => {
-                                if let Some(payload) = response.get("payload") {
-                                    if let Some(data) = payload.get("data") {
-                                        if let Some(deployments_data) = data.get("deployments") {
-                                            if let Ok(deployments) =
-                                                serde_json::from_value::<Vec<serde_json::Value>>(
-                                                    deployments_data.clone(),
-                                                )
-                                            {
-                                                for deployment in deployments {
-                                                    let deploy_id = deployment
-                                                        .get("deploy_id")
-                                                        .and_then(|v| v.as_str())
-                                                        .unwrap_or("");
+                                if let Some(payload) = response.get("payload")
+                                    && let Some(data) = payload.get("data")
+                                    && let Some(deployments_data) = data.get("deployments")
+                                    && let Ok(deployments) =
+                                        serde_json::from_value::<Vec<serde_json::Value>>(
+                                            deployments_data.clone(),
+                                        )
+                                {
+                                    for deployment in deployments {
+                                        let deploy_id = deployment
+                                            .get("deploy_id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("");
 
-                                                    if !displayed_deploys.contains(deploy_id) {
-                                                        display_deployment(&deployment, address);
-                                                        displayed_deploys
-                                                            .insert(deploy_id.to_string());
-                                                    }
-                                                }
-                                            }
+                                        if !displayed_deploys.contains(deploy_id) {
+                                            display_deployment(&deployment, address);
+                                            displayed_deploys.insert(deploy_id.to_string());
                                         }
                                     }
                                 }
@@ -194,21 +190,21 @@ fn display_deployment(deployment: &serde_json::Value, wallet_address: &str) {
     println!("Status: {}", status);
     println!("Created at: {}", formatted_date);
 
-    if let Some(transfers) = deployment.get("transfers").and_then(|v| v.as_array()) {
-        if !transfers.is_empty() {
-            println!("\n 💳  Associated Transfers:");
-            for transfer in transfers {
-                let from_address = get_deployment_field(transfer, "from_address", "unknown");
-                let to_address = get_deployment_field(transfer, "to_address", "unknown");
-                let amount_dust = get_deployment_field(transfer, "amount_dust", "0");
+    if let Some(transfers) = deployment.get("transfers").and_then(|v| v.as_array())
+        && !transfers.is_empty()
+    {
+        println!("\n 💳  Associated Transfers:");
+        for transfer in transfers {
+            let from_address = get_deployment_field(transfer, "from_address", "unknown");
+            let to_address = get_deployment_field(transfer, "to_address", "unknown");
+            let amount_dust = get_deployment_field(transfer, "amount_dust", "0");
 
-                if from_address == wallet_address {
-                    println!("  → OUT | {} dust", amount_dust);
-                    println!("     To: {}", to_address);
-                } else {
-                    println!("  ← IN  | {} dust", amount_dust);
-                    println!("     From: {}", from_address);
-                }
+            if from_address == wallet_address {
+                println!("  → OUT | {} dust", amount_dust);
+                println!("     To: {}", to_address);
+            } else {
+                println!("  ← IN  | {} dust", amount_dust);
+                println!("     From: {}", from_address);
             }
         }
     }

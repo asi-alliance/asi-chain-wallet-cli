@@ -27,6 +27,7 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 6. [Token Decimals](#token-decimals)
 7. [Project Structure](#project-structure)
 8. [Contributing](#contributing)
+9. [Branch status and client dependency](#branch-status-and-client-dependency)
 
 ---
 
@@ -42,6 +43,47 @@ ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain b
 - Monitor deploy history in real-time via WebSocket
 - Export deploy history to JSON or CSV format
 
+## Branch status and client dependency
+
+Check current PR status and branch revisions before starting new work.
+
+| Wallet CLI branch | Current role | Use for the current Rust-node integration |
+|---|---|---|
+| `dev` | Active integration branch | Start current work here. Wallet [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6) introduced the typed client integration. |
+| `main` | Repository default and release branch; still `cd5d37ce651119c39de58e910db538729948e270` while [#3](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/3) is open | Await the reviewed dev-to-main promotion for this integration. Main is a release branch, not deprecated. A plain default-branch clone currently gets older code. |
+| `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
+| `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
+
+The Cargo Git dependency uses ASI client 0.3.0 pinned to
+[`9292f5433b4d727d9a226f2f5766dfd088e14948`](https://github.com/asi-alliance/asi-chain-client/commit/9292f5433b4d727d9a226f2f5766dfd088e14948).
+Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
+The library preserves ASI metadata, exact raw-dust amounts and the
+`rho:vault:system` transfer ABI; its CLI remains disabled.
+Send checks the validator's token symbol and shard and reads its minimum Phlo
+price before signing. It uses a floor of one and signs with a uint256 price,
+subject to the client checking that price × Phlo limit fits in uint256.
+HTTP prices accept exact JSON integers and decimal strings.
+
+`Cargo.toml` selects the exact commit with `rev`, and `Cargo.lock` records the
+Git source. Cargo fetches the client automatically.
+The integration image is built from upstream `F1R3FLY-io/f1r3node-rust` dev at
+`49ce9074bc5aafef24ab5c25bfdd60685d64d464`, selected on 2026-11-11.
+The workflow and test topology pin
+`amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab`
+(published tag `dev-49ce9074bc5a`). The previous
+image used the old monetary protobuf and rejected this client's signatures.
+On the previous client pin, local acceptance passed on this image with 7 unit
+tests, 2 HTTP tests, and the full node scenario (197.13 seconds).
+
+History/export acceptance remains under
+[issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);
+branch selection and green packaging checks do not replace deployment acceptance.
+
+Testnet ECR builds default to remote dev unless the owner explicitly selects
+another source. Freeze its full SHA and preserve the committed client revision.
+Published images retain their original source identity. A client pin update
+does not rebuild or relabel an existing artifact.
+
 ## Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) (edition 2024)
@@ -50,24 +92,17 @@ ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain b
 
 ## Installation
 
-Clone the repository with submodules:
+Clone the repository:
 
 ```bash
-git clone https://github.com/asi-alliance/asi-chain-wallet-cli.git
+git clone --branch dev https://github.com/asi-alliance/asi-chain-wallet-cli.git
 cd asi-chain-wallet-cli
-git submodule init
-git submodule update
-```
-
-Keep rust-client submodule up-to-dated by running:
-```bash
-git submodule update --init --remote -- rust-client 
 ```
 
 Build the project:
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ```
 
 ## Configuration
@@ -81,36 +116,61 @@ cp .env.example .env
 Edit `.env` with your network configuration:
 
 ```env
-VALIDATOR_HOST=<VALIDATOR_IP>
-VALIDATOR_GRPC_PORT=40432
-VALIDATOR_HTTP_PORT=40433
-
-OBSERVER_HOST=<OBSERVER_IP>
-OBSERVER_GRPC_PORT=40452
-
+VALIDATOR_GRPC_URL=http://127.0.0.1:40412
+VALIDATOR_HTTP_URL=http://127.0.0.1:40413
+OBSERVER_HTTP_URL=http://127.0.0.1:40453
 OUTPUT_DIR=./credentials
-TOKEN=ASI
-
-# Logging control: set to "true" to show all logs from rust-client, "false" to hide them
+EXPECTED_TOKEN_SYMBOL=ASI
+SHARD_ID=root
 VERBOSE_LOGS=false
-
-# For deploy history
-GRAPHQL_URL=<GRAPHQL_API_ENDPOINT>
+GRAPHQL_URL=wss://your-gateway.example/v1/graphql
 ```
 
-**Required Configuration:**
+These loopback ports illustrate a locally mapped validator/observer; use the
+actual endpoints of your deployment. HTTP URLs support a gateway base path.
+`https://` uses TLS; optional `NODE_CA_CERT` supplies a private CA for all endpoints.
+`NODE_CONNECT_TIMEOUT_SECONDS` / `NODE_TIMEOUT_SECONDS` default to 10 / 30.
 
-| Variable | Description |
-|----------|-------------|
-| `VALIDATOR_HOST` | IP address of the validator node for sending deploys |
-| `VALIDATOR_GRPC_PORT` | gRPC port of the validator node (default: 40432) |
-| `VALIDATOR_HTTP_PORT` | HTTP port of the validator node (default: 40433) |
-| `OBSERVER_HOST` | IP address of the observer node for read operations |
-| `OBSERVER_GRPC_PORT` | gRPC port of the observer node (default: 40452) |
-| `OUTPUT_DIR` | Directory for storing wallet credentials (default: ./credentials) |
-| `TOKEN` | Token name (default: ASI) |
-| `VERBOSE_LOGS` | Show detailed logs from rust-client (default: false) |
-| `GRAPHQL_URL` | GraphQL API endpoint for deploy history |
+Legacy `VALIDATOR_HOST` plus `VALIDATOR_GRPC_PORT` / `VALIDATOR_HTTP_PORT`
+remain supported when URLs are absent. For the observer, supply
+`OBSERVER_HTTP_URL` or `OBSERVER_HOST` plus **`OBSERVER_HTTP_PORT`** explicitly.
+`OBSERVER_GRPC_PORT` is no longer used. HTTP ports are never inferred from gRPC.
+
+`GRAPHQL_URL` is needed only for history/export. Its schema/permissions must
+match the selected indexer/Hasura release; do not put admin credentials into a
+public URL. Secure WebSocket (`wss`) transport is enabled.
+
+`DEPLOY_MAX_WAIT_SECONDS` defaults to 480 and
+`DEPLOY_CHECK_INTERVAL_SECONDS` to 5. Both must be positive; the poll interval
+must not exceed the total wait budget.
+
+## Compatibility baseline and tests
+
+The candidate uses the exact client/node pins above, the root Cargo.lock and
+`nightly-2026-02-09`. Registry dependency versions are unchanged. Run existing
+checks with `CARGO_BUILD_JOBS=2`:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --features integration --locked -- -D warnings
+cargo test --release --locked
+cargo build --release --locked
+FIREFLY_NODE_IMAGE=amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab \
+cargo test --release --features integration --test node_compatibility --locked
+```
+
+The last command requires Docker and creates its own shard with fresh test
+keys/state. The wallet owns the fixture helpers in `tests/support`, copied from
+the pinned client revision under Apache-2.0, and the topology in
+`tests/integration/topology`. Both the harness default and CI select the immutable
+node image documented above. Loopback ports 40400-40462 must be free; an existing
+`rust-client-it` project causes refusal before any cleanup. Only its freshly
+created shard is torn down. No node build or existing genesis change is performed.
+
+See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
+The wallet command test checks exact balances/transfers, vault rejection and
+an intentionally withheld finalization verdict. Full history/export acceptance
+against the deployed Hasura schema remains a separate staging requirement.
 
 ## Commands
 
@@ -151,6 +211,13 @@ cargo run -- send --to <recipient-address> --amount <amount>
 ```bash
 cargo run -- send --to 1111AtahZeefej4tvVR6ti9TJtv8yxLebT31SCEVDCKMNikBk5r3g --amount 100000000
 ```
+
+A deploy ID is printed before submission, so a lost response still leaves a
+queryable identifier. Success requires canonical finalization and a positive
+vault result. A rejected/failed/expired transfer exits non-zero. Missing or
+conflicting verdicts, transport errors and timeouts also exit non-zero and
+report an unknown outcome with the original deploy ID. Check that ID; never
+create a replacement payment automatically.
 
 ### Deploy History
 
@@ -212,16 +279,24 @@ docker build -t wallet-cli .
 
 ### Run with Docker Compose 
 
-Run commands:
+On Linux, create the bind-mounted directories as the account that owns the
+wallet files. Run the CLI with that account's UID and GID so it can save the
+wallet and write exports. The image defaults to UID and GID 10001.
 
 ```bash
-docker compose run --rm wallet-cli balance
-docker compose run --rm wallet-cli send --to <ADDRESS> --amount 1000
+(umask 077 && mkdir -p credentials exports)
+docker compose run --rm --user "$(id -u):$(id -g)" wallet-cli balance
+docker compose run --rm --user "$(id -u):$(id -g)" wallet-cli send --to <ADDRESS> --amount 1000
 ```
 
 ## Token Decimals
 
-ASI token uses 8 decimal places. When specifying amounts:
+`--amount` is an exact unsigned integer in raw base units (dust), up to
+`2^256 - 1`. Zero, negative, fractional, exponent and overflowing inputs fail.
+No floating-point scaling is performed. Balance display uses the node's native
+token metadata and checks the expected symbol/shard before queries or transfers.
+
+For an ASI network configured with **8 decimals**, the conversion is:
 
 | Human Amount | CLI Amount |
 |--------------|------------|
@@ -230,7 +305,7 @@ ASI token uses 8 decimal places. When specifying amounts:
 | 10 ASI | 1000000000 |
 | 100 ASI | 10000000000 |
 
-**Formula:** `CLI Amount = Human Amount × 10^8`
+**Formula:** `CLI Amount = Human Amount × 10^decimals`, with decimals from the actual network.
 
 ## Project Structure
 
@@ -253,7 +328,7 @@ asi-chain-wallet-cli/
 │   └── utils/
 │       ├── deployment.rs   # Deployment utilities
 │       └── websocket.rs    # WebSocket connection
-└── rust-client/            # Submodule: low-level node CLI
+└── tests/support/          # Wallet-owned node test fixtures
 ```
 
 ## Contributing

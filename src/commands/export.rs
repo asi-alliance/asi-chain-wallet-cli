@@ -33,6 +33,10 @@ pub async fn handle_export(
     output: Option<&str>,
     limit: Option<u32>,
 ) -> Result<()> {
+    anyhow::ensure!(
+        !config.graphql_url.trim().is_empty(),
+        "GRAPHQL_URL is required for history/export"
+    );
     let wallet = config.get_wallet()?;
     let limit = limit.unwrap_or(100);
 

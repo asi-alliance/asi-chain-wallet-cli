@@ -1,89 +1,170 @@
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use std::env;
-use std::fs;
-use std::path::Path;
+use anyhow::{Context, Result, ensure};
+use node_cli::{Endpoint, SigningKey, utils::CryptoUtils};
+use std::{env, fs, path::Path, time::Duration};
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct WalletInfo {
-    pub private_key: String,
-    pub public_key: String,
-    pub address: String,
-}
+use crate::models::WalletInfo;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
-    pub validator_host: String,
-    pub validator_grpc_port: u16,
-    pub validator_http_port: u16,
-
-    pub observer_host: String,
-    pub observer_grpc_port: u16,
-
+    pub validator_grpc: Endpoint,
+    pub validator_http: Endpoint,
+    pub observer_http: Endpoint,
     pub output_dir: String,
-    pub token: String,
     pub verbose_logs: bool,
     pub graphql_url: String,
-}
-
-impl Clone for Config {
-    fn clone(&self) -> Self {
-        Self {
-            validator_host: self.validator_host.clone(),
-            validator_grpc_port: self.validator_grpc_port,
-            validator_http_port: self.validator_http_port,
-            observer_host: self.observer_host.clone(),
-            observer_grpc_port: self.observer_grpc_port,
-            output_dir: self.output_dir.clone(),
-            token: self.token.clone(),
-            verbose_logs: self.verbose_logs,
-            graphql_url: self.graphql_url.clone(),
-        }
-    }
+    pub shard_id: String,
+    pub expected_token_symbol: String,
+    pub max_wait: u32,
+    pub check_interval: u64,
 }
 
 impl Config {
     pub fn from_env() -> Result<Self> {
+        Self::from_lookup(|key| env::var(key).ok())
+    }
+
+    fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Self> {
+        let required = |key: &str| get(key).with_context(|| format!("{key} is not set"));
+        let positive = |key: &str, default: u64| -> Result<u64> {
+            let value = get(key)
+                .map(|s| s.parse::<u64>())
+                .transpose()
+                .with_context(|| format!("Invalid {key}"))?
+                .unwrap_or(default);
+            ensure!(value > 0, "{key} must be greater than zero");
+            Ok(value)
+        };
+        let connect_timeout = Duration::from_secs(positive("NODE_CONNECT_TIMEOUT_SECONDS", 10)?);
+        let timeout = Duration::from_secs(positive("NODE_TIMEOUT_SECONDS", 30)?);
+        let ca = get("NODE_CA_CERT")
+            .map(fs::read)
+            .transpose()
+            .context("Cannot read NODE_CA_CERT")?;
+        let endpoint = |url_key: &str, host_key: &str, port_key: &str| -> Result<Endpoint> {
+            let url = match get(url_key) {
+                Some(url) => url,
+                None => {
+                    let host = required(host_key)?;
+                    let port = required(port_key)?
+                        .parse::<u16>()
+                        .with_context(|| format!("Invalid {port_key}"))?;
+                    ensure!(port > 0, "{port_key} must be greater than zero");
+                    let host = if host.contains(':') && !host.starts_with('[') {
+                        format!("[{host}]")
+                    } else {
+                        host
+                    };
+                    format!("http://{host}:{port}")
+                }
+            };
+            let parsed = Endpoint::parse(&url)?
+                .with_connect_timeout(connect_timeout)
+                .with_request_timeout(timeout);
+            Ok(match &ca {
+                Some(pem) => parsed.with_ca_certificates(pem.clone())?,
+                None => parsed,
+            })
+        };
+        let max_wait = u32::try_from(positive("DEPLOY_MAX_WAIT_SECONDS", 480)?)
+            .context("DEPLOY_MAX_WAIT_SECONDS exceeds u32")?;
+        let check_interval = positive("DEPLOY_CHECK_INTERVAL_SECONDS", 5)?;
+        ensure!(
+            check_interval <= u64::from(max_wait),
+            "Poll interval must not exceed the wait budget"
+        );
         Ok(Self {
-            validator_host: env::var("VALIDATOR_HOST")
-                .context("VALIDATOR_HOST is not set in .env")?,
-            validator_grpc_port: env::var("VALIDATOR_GRPC_PORT")
-                .context("VALIDATOR_GRPC_PORT is not set in .env")?
+            validator_grpc: endpoint(
+                "VALIDATOR_GRPC_URL",
+                "VALIDATOR_HOST",
+                "VALIDATOR_GRPC_PORT",
+            )?,
+            validator_http: endpoint(
+                "VALIDATOR_HTTP_URL",
+                "VALIDATOR_HOST",
+                "VALIDATOR_HTTP_PORT",
+            )?,
+            observer_http: endpoint("OBSERVER_HTTP_URL", "OBSERVER_HOST", "OBSERVER_HTTP_PORT")?,
+            output_dir: required("OUTPUT_DIR")?,
+            verbose_logs: get("VERBOSE_LOGS")
+                .unwrap_or_else(|| "false".into())
                 .parse()
-                .context("Invalid VALIDATOR_GRPC_PORT value")?,
-            validator_http_port: env::var("VALIDATOR_HTTP_PORT")
-                .context("VALIDATOR_HTTP_PORT is not set in .env")?
-                .parse()
-                .context("Invalid VALIDATOR_HTTP_PORT value")?,
-
-            observer_host: env::var("OBSERVER_HOST").context("OBSERVER_HOST is not set in .env")?,
-            observer_grpc_port: env::var("OBSERVER_GRPC_PORT")
-                .context("OBSERVER_GRPC_PORT is not set in .env")?
-                .parse()
-                .context("Invalid OBSERVER_GRPC_PORT value")?,
-
-            output_dir: env::var("OUTPUT_DIR").context("OUTPUT_DIR is not set in .env")?,
-            token: env::var("TOKEN").context("TOKEN is not set in .env")?,
-
-            verbose_logs: env::var("VERBOSE_LOGS")
-                .context("VERBOSE_LOGS is not set in .env")?
-                .parse()
-                .context("Invalid VERBOSE_LOGS value (expected true/false)")?,
-
-            graphql_url: env::var("GRAPHQL_URL").context("GRAPHQL_URL is not set in .env")?,
+                .context("VERBOSE_LOGS must be true or false")?,
+            graphql_url: get("GRAPHQL_URL").unwrap_or_default(),
+            shard_id: get("SHARD_ID").unwrap_or_else(|| "root".into()),
+            expected_token_symbol: get("EXPECTED_TOKEN_SYMBOL").unwrap_or_else(|| "ASI".into()),
+            max_wait,
+            check_interval,
         })
     }
 
     pub fn get_wallet(&self) -> Result<WalletInfo> {
         let wallet_file = Path::new(&self.output_dir).join("wallet_info.json");
-        let wallet_json = fs::read_to_string(&wallet_file).context(format!(
-            "Failed to read wallet info from {}",
-            wallet_file.display()
-        ))?;
+        let json = fs::read_to_string(&wallet_file)
+            .with_context(|| format!("Failed to read {}", wallet_file.display()))?;
+        let wallet: WalletInfo = serde_json::from_str(&json).context("Invalid wallet_info.json")?;
+        validate_wallet(&wallet)?;
+        Ok(wallet)
+    }
+}
 
-        let wallet_info: WalletInfo =
-            serde_json::from_str(&wallet_json).context("Failed to parse wallet_info.json")?;
+pub fn validate_wallet(wallet: &WalletInfo) -> Result<()> {
+    let key = SigningKey::from_hex(&wallet.private_key)?;
+    let public = CryptoUtils::serialize_public_key(&key.public_key(), false);
+    let derived = CryptoUtils::generate_vault_address(&public)?;
+    ensure!(
+        derived == wallet.address,
+        "Wallet private key does not match its address"
+    );
+    ensure!(
+        CryptoUtils::generate_vault_address(&wallet.public_key)? == derived,
+        "Wallet public key does not match its address"
+    );
+    Ok(())
+}
 
-        Ok(wallet_info)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    fn values() -> HashMap<&'static str, String> {
+        [
+            ("VALIDATOR_GRPC_URL", "http://localhost:40401"),
+            ("VALIDATOR_HTTP_URL", "https://example.test/node"),
+            ("OBSERVER_HTTP_URL", "http://localhost:40453"),
+            ("OUTPUT_DIR", "credentials"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k, v.into()))
+        .collect()
+    }
+    #[test]
+    fn explicit_urls_keep_base_paths_and_do_not_need_old_grpc_observer_port() {
+        let env = values();
+        let c = Config::from_lookup(|k| env.get(k).cloned()).unwrap();
+        assert_eq!(c.validator_http.to_string(), "https://example.test/node");
+        assert_eq!(c.observer_http.to_string(), "http://localhost:40453");
+    }
+    #[test]
+    fn legacy_hosts_need_an_explicit_observer_http_port() {
+        let mut env = values();
+        env.remove("OBSERVER_HTTP_URL");
+        env.insert("OBSERVER_HOST", "localhost".into());
+        env.insert("OBSERVER_GRPC_PORT", "40452".into());
+        assert!(Config::from_lookup(|k| env.get(k).cloned()).is_err());
+        env.insert("OBSERVER_HTTP_PORT", "40453".into());
+        assert!(Config::from_lookup(|k| env.get(k).cloned()).is_ok());
+    }
+    #[test]
+    fn invalid_polling_budgets_fail_before_a_deploy() {
+        for (key, value) in [
+            ("DEPLOY_MAX_WAIT_SECONDS", "0"),
+            ("DEPLOY_CHECK_INTERVAL_SECONDS", "0"),
+            ("DEPLOY_CHECK_INTERVAL_SECONDS", "481"),
+            ("NODE_TIMEOUT_SECONDS", "0"),
+        ] {
+            let mut env = values();
+            env.insert(key, value.into());
+            assert!(Config::from_lookup(|k| env.get(k).cloned()).is_err());
+        }
     }
 }

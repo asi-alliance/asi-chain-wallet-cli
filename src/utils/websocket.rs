@@ -34,13 +34,12 @@ pub async fn connect_graphql_websocket(graphql_url: &str) -> Result<(WsSink, WsS
         .context("Failed to send connection_init")?;
 
     while let Some(msg) = read.next().await {
-        if let Ok(Message::Text(text)) = msg {
-            if let Ok(response) = serde_json::from_str::<serde_json::Value>(&text) {
-                if response.get("type").and_then(|v| v.as_str()) == Some("connection_ack") {
-                    println!("✓ Connected to WebSocket");
-                    return Ok((write, read));
-                }
-            }
+        if let Ok(Message::Text(text)) = msg
+            && let Ok(response) = serde_json::from_str::<serde_json::Value>(&text)
+            && response.get("type").and_then(|v| v.as_str()) == Some("connection_ack")
+        {
+            println!("✓ Connected to WebSocket");
+            return Ok((write, read));
         }
     }
 
