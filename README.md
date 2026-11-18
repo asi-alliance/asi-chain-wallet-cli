@@ -55,38 +55,39 @@ have different roles. Check current PR/ref status before starting new work.
 | `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
-The dependency is the **gitlink**, not a sibling checkout, the fork's default
-branch, or a matching package version. The current wallet integration pins
-[`asi-alliance/asi-chain-client` at `77cbdc8180d8f83a7216dbf54b23268106ea3e91`](https://github.com/asi-alliance/asi-chain-client/commit/77cbdc8180d8f83a7216dbf54b23268106ea3e91).
-Use `git submodule update --init --recursive`; do not use `--remote` to substitute
-a moving head. Keep this pin until a separate API/node compatibility review
-accepts a replacement.
+The Cargo git dependency pins `F1R3FLY-io/rust-client` at
+`e8620a46572dbc2ec53c81f4389f5abf5c02f0b0` from branch
+`fix/node-789-admission-refusals`. [Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86)
+Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
+The library preserves ASI metadata, exact raw-dust amounts and the
+`rho:vault:system` transfer ABI; its CLI remains disabled.
+Send reads the validator's minimum Phlo price before signing and checks its
+symbol/shard. This client accepts prices in the positive `i64` range and encodes
+them as 32-byte uint256 protobuf values. Larger prices fail before signing.
+HTTP integer responses support both numeric and string encodings.
 
-| Client repository branch | Current status |
-|---|---|
-| `dev` | Active ASI integration branch after [client #3](https://github.com/asi-alliance/asi-chain-client/pull/3) merged as `40f2a94`. It contains the tested runtime `77cbdc8`; keep using the wallet's exact gitlink rather than moving dev. |
-| `main` | Currently matches upstream release v0.2.9. It is not the tested ASI integration commit simply because its version is 0.2.9. Future ASI release promotion is separate. |
-| `asi-main` | Historical ASI 0.1.1 line; still the GitHub default during the transition. It is not the current wallet dependency. |
-| `asi-dev` | Older separate ASI line, with a unique OpenSSL/target-configuration commit; not the selected wallet baseline. |
+`Cargo.toml` selects this exact commit with `rev`, and `Cargo.lock`
+records the Git source. Cargo fetches the client automatically; no submodule
+initialization is required.
+The integration image is built from upstream `F1R3FLY-io/f1r3node-rust` dev at
+`49ce9074bc5aafef24ab5c25bfdd60685d64d464`, selected on 2026-11-11.
+The workflow and test topology pin
+`amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab`
+(published tag `dev-49ce9074bc5a`). The previous
+image used the old monetary protobuf and rejected this client's signatures.
+The previous `dev` client pin passed local acceptance on this image with 7 unit
+tests, 2 HTTP tests and the full node scenario (197.13 seconds). That run used free
+`414xx` host ports to avoid the existing network; CI retains its isolated
+`404xx` port mapping. No test assertions were removed.
 
-The client PR is merged into dev; changing the client default branch, legacy refs
-or releasing main remains separate work. The node source is maintained
-`F1R3FLY-io/f1r3node-rust`, revision `5dafbc37`; the old-parent ASI Rust-node
-fork and Scala repositories are excluded. No new node build is needed for
-these documentation changes.
-
-See the [infra wallet handoff](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/wallet-cli-pr6.md),
-[client branch audit](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/handoffs/2026-11-03/client-branches.md)
-and [candidate image record](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/wallet-cli-pr6-20261103-8f6c20ea43eb.md)
-for exact source/image evidence. History/export acceptance remains under #5;
+History/export acceptance remains under
+[issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);
 branch selection and green packaging checks do not replace deployment acceptance.
 
 Testnet ECR builds default to remote dev unless the owner explicitly selects
-another source. Freeze its full SHA and preserve the committed client gitlink.
-The [image inventory](https://github.com/asi-alliance/asi-chain-testnet-infra/blob/main/docs/releases/image-inventory-20261103.md#published-image-sources)
-records the current image built from PR #6 commit `8f6c20ea43eb`; its source tree
-equals the dev merge `3a8f31e`. Later documentation commits do not change that
-runtime or relabel the published artifact.
+another source. Freeze its full SHA and preserve the committed client revision.
+Published images retain their original source identity. A client pin update
+does not rebuild or relabel an existing artifact.
 
 ## Prerequisites
 
@@ -96,17 +97,11 @@ runtime or relabel the published artifact.
 
 ## Installation
 
-Clone the repository with submodules:
+Clone the repository:
 
 ```bash
-git clone --branch dev --recurse-submodules https://github.com/asi-alliance/asi-chain-wallet-cli.git
+git clone --branch dev https://github.com/asi-alliance/asi-chain-wallet-cli.git
 cd asi-chain-wallet-cli
-```
-
-The submodule is pinned to the reviewed ASI client commit. Use the recorded gitlink;
-do not use `--remote` to replace it with a moving branch:
-```bash
-git submodule update --init --recursive
 ```
 
 Build the project:
@@ -154,46 +149,38 @@ public URL. Secure WebSocket (`wss`) transport is enabled.
 `DEPLOY_CHECK_INTERVAL_SECONDS` to 5. Both must be positive; the poll interval
 must not exceed the total wait budget.
 
-## Draft admission compatibility
+## Deploy admission refusals
 
-This draft pins ASI client [#6](https://github.com/asi-alliance/asi-chain-client/pull/6)
-commit `62b633ab05bb9d4e54672e8c2db1437264c3437b` for node
-[#789](https://github.com/F1R3FLY-io/f1r3node-rust/pull/789). Explicit
-`deploy_pool_busy` and `deploy_admission_busy` refusals report that the transfer
-was not accepted and can be tried later. Submission/confirmation timeouts keep
-the unknown-outcome warning and the original deploy ID. No automatic new payment
-is created. The historical dev baseline below remains its prior acceptance record;
-this candidate requires its own compatibility checks before merge.
+The client reports explicit refusals from node admission and from the deploy queue.
+The CLI shows the original deploy ID and offers retry guidance for retryable
+refusals. A rejection after queue admission is a terminal transfer failure.
+Submission and confirmation timeouts keep the unknown-outcome warning and direct
+the operator to check the original deploy ID before creating another payment.
+[Node admission PR #789](https://github.com/F1R3FLY-io/f1r3node-rust/pull/789),
+[deploy queue PR #990](https://github.com/F1R3FLY-io/f1r3node-rust/pull/990)
 
 ## Compatibility baseline and tests
 
-This update uses ASI client `77cbdc8180d8f83a7216dbf54b23268106ea3e91`
-from [client PR #3](https://github.com/asi-alliance/asi-chain-client/pull/3),
-`node_cli 0.2.9`, with CLI dependencies disabled. All node protocol crates
-are pinned there to `f1r3node-rust` source
-`5dafbc37dad3ebf3da810641fc0d8cecd5a1127b`. The root Cargo.lock and
-`nightly-2026-02-09` pin dependency resolution and compiler selection.
+The candidate uses the exact client/node pins above, the root Cargo.lock and
+`nightly-2026-02-09`. Registry dependency versions are unchanged. Run existing
+checks with `CARGO_BUILD_JOBS=2`:
 
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --features integration --locked -- -D warnings
 cargo test --release --locked
 cargo build --release --locked
+FIREFLY_NODE_IMAGE=amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab \
 cargo test --release --features integration --test node_compatibility --locked
 ```
 
 The last command requires Docker and creates its own shard with fresh test
-keys/state. It uses the existing immutable linux/amd64 image:
-
-```text
-public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:e6e82cdc5c9bc794367e15314d9c22256a8ebc0b2457d9492d633b2453c4c1df
-```
-
-It reuses fixture helpers from the exact pinned client submodule and the
-versioned topology in `tests/integration/topology`. Loopback ports 40400-40462
-must be free; an existing `rust-client-it` project causes refusal before any
-cleanup. Only its freshly created shard is torn down. No node build or existing
-genesis change is performed.
+keys/state. The wallet owns the fixture helpers in `tests/support`, copied from
+the pinned client revision under Apache-2.0, and the topology in
+`tests/integration/topology`. Both the harness default and CI select the immutable
+node image documented above. Loopback ports 40400-40462 must be free; an existing
+`rust-client-it` project causes refusal before any cleanup. Only its freshly
+created shard is torn down. No node build or existing genesis change is performed.
 
 See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
 The wallet command test checks exact balances/transfers, vault rejection and
@@ -353,7 +340,7 @@ asi-chain-wallet-cli/
 │   └── utils/
 │       ├── deployment.rs   # Deployment utilities
 │       └── websocket.rs    # WebSocket connection
-└── rust-client/            # Submodule: low-level node CLI
+└── tests/support/          # Wallet-owned node test fixtures
 ```
 
 ## Contributing

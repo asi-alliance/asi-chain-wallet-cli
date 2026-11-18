@@ -1,9 +1,13 @@
 use crate::config::Config;
 use anyhow::{Result, ensure};
-use node_cli::{Balance, NodeHttp, f1r3fly_api::NodeStatus};
+use node_cli::{Balance, Endpoint, NodeHttp, f1r3fly_api::NodeStatus};
 
 pub async fn metadata(config: &Config) -> Result<NodeStatus> {
-    let node = NodeHttp::new(config.observer_http.clone())?;
+    metadata_at(config, &config.observer_http).await
+}
+
+pub async fn metadata_at(config: &Config, endpoint: &Endpoint) -> Result<NodeStatus> {
+    let node = NodeHttp::new(endpoint.clone())?;
     let status: NodeStatus = serde_json::from_value(node.get_json("/api/status").await?)?;
     ensure!(
         status.native_token_symbol == config.expected_token_symbol,
@@ -13,7 +17,7 @@ pub async fn metadata(config: &Config) -> Result<NodeStatus> {
     );
     ensure!(
         status.shard_id == config.shard_id,
-        "Observer shard does not match SHARD_ID"
+        "Node shard does not match SHARD_ID"
     );
     Ok(status)
 }

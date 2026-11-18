@@ -1,25 +1,29 @@
-use crate::balance::{get_balance, metadata};
+use crate::balance::{get_balance, metadata, metadata_at};
 use crate::config::Config;
 use anyhow::{Result, anyhow, ensure};
 use node_cli::{ConnectionConfig, DeployOptions, F1r3flyConnectionManager, SigningKey};
 use num_bigint::BigUint;
 
 fn transfer_amount(value: &str) -> Result<BigUint> {
-    let amount = node_cli::vault::parse_amount(value)?;
+    let significant = value.trim_start_matches('0');
     ensure!(
-        amount != BigUint::from(0u8),
+        value.is_empty() || !significant.is_empty(),
         "Amount must be greater than zero"
     );
-    Ok(amount)
+    Ok(node_cli::vault::parse_amount(significant)?)
 }
 
 fn send_error(id: &str, error: node_cli::Error) -> anyhow::Error {
     match error {
-        node_cli::Error::DeployAdmissionRefused { .. } => anyhow!(
-            "Transfer not accepted by the node for deploy {id}: {error}. Please try again later."
-        ),
+        node_cli::Error::DeployAdmissionRefused { reason, .. } if reason.is_retryable() => {
+            anyhow!("Transfer not accepted for deploy {id}: {error}. Please try again later.")
+        }
+        node_cli::Error::DeployAdmissionRefused { .. } => {
+            anyhow!("Transfer not accepted for deploy {id}: {error}")
+        }
         node_cli::Error::DeployFailed { .. }
         | node_cli::Error::DeployExpired { .. }
+        | node_cli::Error::DeployRejected { .. }
         | node_cli::Error::NodeRejected { .. }
         | node_cli::Error::ContractRejected { .. } => {
             anyhow!("Transfer failed for deploy {id}: {error}")
@@ -36,6 +40,7 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     let config = Config::from_env()?;
     let wallet = config.get_wallet()?;
     let token = metadata(&config).await?;
+    let validator = metadata_at(&config, &config.validator_http).await?;
     let balance = get_balance(&config, &wallet.address).await?;
     ensure!(
         balance.dust >= amount,
@@ -55,6 +60,11 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     let term = node_cli::vault::build_transfer_rholang(&wallet.address, to, &amount)?;
     let mut options =
         DeployOptions::default().with_phlo_limit(node_cli::vault::TRANSFER_PHLO_LIMIT);
+    options.phlo_price = validator.min_phlo_price.max(1u8.into());
+    ensure!(
+        options.phlo_price <= BigUint::from(i64::MAX as u64),
+        "Validator minimum Phlo price exceeds the client i64 range"
+    );
     options.expiration = Some(chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000);
     let signed = manager
         .api()
@@ -94,11 +104,13 @@ mod tests {
         ] {
             assert_eq!(transfer_amount(value).unwrap().to_string(), value);
         }
+        assert_eq!(transfer_amount("0001").unwrap(), BigUint::from(1u8));
     }
     #[test]
     fn zero_negative_fractional_and_overflow_amounts_are_rejected() {
         for value in [
             "0",
+            "000",
             "-1",
             "1.5",
             "1e8",
@@ -123,9 +135,10 @@ mod tests {
     }
     #[test]
     fn admission_refusals_are_distinct_from_unknown_outcomes() {
-        for reason in [
-            node_cli::DeployAdmissionReason::PoolBusy,
-            node_cli::DeployAdmissionReason::AdmissionBusy,
+        for (reason, retryable) in [
+            (node_cli::DeployAdmissionReason::PoolBusy, true),
+            (node_cli::DeployAdmissionReason::AdmissionBusy, true),
+            (node_cli::DeployAdmissionReason::TooLarge, false),
         ] {
             let err = send_error(
                 "original-id",
@@ -133,12 +146,15 @@ mod tests {
                     deploy_id: "original-id".into(),
                     reason,
                     message: "busy".into(),
+                    retry_after: None,
+                    congestion: None,
                 },
             );
             let message = err.to_string();
             assert!(message.contains("not accepted"));
             assert!(message.contains("original-id"));
             assert!(message.contains(reason.code()));
+            assert_eq!(message.contains("Please try again later"), retryable);
             assert!(!message.contains("outcome unknown"));
         }
     }
