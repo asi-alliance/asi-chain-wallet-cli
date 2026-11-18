@@ -45,41 +45,36 @@ ASI Chain Wallet CLI is a command-line tool for interacting with the ASI Chain b
 
 ## Branch status and client dependency
 
-Verified on 2026-11-03. Branches with the same name in different repositories
-have different roles. Check current PR/ref status before starting new work.
+Check current PR status and branch revisions before starting new work.
 
 | Wallet CLI branch | Current role | Use for the current Rust-node integration |
 |---|---|---|
-| `dev` | Active integration branch; #6 merged as `3a8f31e030a5d3d78e7abdc3b3fce6cd326ec8f0` | Start current work here. It contains the tested ASI client 0.2.9 adaptation for node 0.4.46. |
+| `dev` | Active integration branch | Start current work here. Wallet [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6) introduced the typed client integration. |
 | `main` | Repository default and release branch; still `cd5d37ce651119c39de58e910db538729948e270` while [#3](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/3) is open | Await the reviewed dev-to-main promotion for this integration. Main is a release branch, not deprecated. A plain default-branch clone currently gets older code. |
 | `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
-The Cargo git dependency pins `F1R3FLY-io/rust-client` at
+The Cargo Git dependency pins `F1R3FLY-io/rust-client` at
 `e8620a46572dbc2ec53c81f4389f5abf5c02f0b0` from branch
 `fix/node-789-admission-refusals`. [Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86)
 Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
-Send reads the validator's minimum Phlo price before signing and checks the
-validator's token symbol and shard. The client encodes the price as a 32-byte
-uint256 protobuf value and checks that the price times the transfer Phlo limit
-fits uint256 before signing.
-HTTP integer responses support both numeric and string encodings.
+Send checks the validator's token symbol and shard and reads its minimum Phlo
+price before signing. It uses a floor of one and signs with a uint256 price,
+subject to the client checking that price × Phlo limit fits in uint256.
+HTTP prices accept exact JSON integers and decimal strings.
 
-`Cargo.toml` selects this exact commit with `rev`, and `Cargo.lock`
-records the Git source. Cargo fetches the client automatically; no submodule
-initialization is required.
+`Cargo.toml` selects the exact commit with `rev`, and `Cargo.lock` records the
+Git source. Cargo fetches the client automatically.
 The integration image is built from upstream `F1R3FLY-io/f1r3node-rust` dev at
 `49ce9074bc5aafef24ab5c25bfdd60685d64d464`, selected on 2026-11-11.
 The workflow and test topology pin
 `amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab`
 (published tag `dev-49ce9074bc5a`). The previous
 image used the old monetary protobuf and rejected this client's signatures.
-The previous `dev` client pin passed local acceptance on this image with 7 unit
-tests, 2 HTTP tests and the full node scenario (197.13 seconds). That run used free
-`414xx` host ports to avoid the existing network; CI retains its isolated
-`404xx` port mapping. No test assertions were removed.
+On the previous client pin, local acceptance passed on this image with 7 unit
+tests, 2 HTTP tests, and the full node scenario (197.13 seconds).
 
 History/export acceptance remains under
 [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5);
