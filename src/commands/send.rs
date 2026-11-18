@@ -5,12 +5,21 @@ use node_cli::{ConnectionConfig, DeployOptions, F1r3flyConnectionManager, Signin
 use num_bigint::BigUint;
 
 fn transfer_amount(value: &str) -> Result<BigUint> {
-    let amount = node_cli::vault::parse_amount(value)?;
+    let significant = value.trim_start_matches('0');
     ensure!(
-        amount != BigUint::from(0u8),
+        value.is_empty() || !significant.is_empty(),
         "Amount must be greater than zero"
     );
-    Ok(amount)
+    Ok(node_cli::vault::parse_amount(significant)?)
+}
+
+fn transfer_deploy_options(min_phlo_price: BigUint, expiration: i64) -> DeployOptions {
+    DeployOptions {
+        phlo_limit: node_cli::vault::TRANSFER_PHLO_LIMIT,
+        phlo_price: min_phlo_price.max(1u8.into()),
+        expiration: Some(expiration),
+        ..DeployOptions::default()
+    }
 }
 
 fn send_error(id: &str, error: node_cli::Error) -> anyhow::Error {
@@ -51,10 +60,10 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     connection.poll_interval_secs = config.check_interval;
     let manager = F1r3flyConnectionManager::new(connection)?;
     let term = node_cli::vault::build_transfer_rholang(&wallet.address, to, &amount)?;
-    let mut options =
-        DeployOptions::default().with_phlo_limit(node_cli::vault::TRANSFER_PHLO_LIMIT);
-    options.phlo_price = validator.min_phlo_price.max(BigUint::from(1u8));
-    options.expiration = Some(chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000);
+    let options = transfer_deploy_options(
+        validator.min_phlo_price,
+        chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000,
+    );
     let signed = manager
         .api()
         .prepare(&term, &options)
@@ -93,11 +102,13 @@ mod tests {
         ] {
             assert_eq!(transfer_amount(value).unwrap().to_string(), value);
         }
+        assert_eq!(transfer_amount("0001").unwrap(), BigUint::from(1u8));
     }
     #[test]
     fn zero_negative_fractional_and_overflow_amounts_are_rejected() {
         for value in [
             "0",
+            "000",
             "-1",
             "1.5",
             "1e8",
@@ -106,6 +117,13 @@ mod tests {
         ] {
             assert!(transfer_amount(value).is_err());
         }
+    }
+    #[test]
+    fn accepts_a_validator_phlo_price_of_two_to_the_63() {
+        let price = BigUint::from(1u64 << 63);
+        let options = transfer_deploy_options(price.clone(), 1);
+        assert_eq!(options.phlo_price, price);
+        node_cli::UnsignedDeploy::new("Nil", &options, 1, "root").unwrap();
     }
     #[test]
     fn a_timeout_is_an_error_with_the_original_deploy_id() {
