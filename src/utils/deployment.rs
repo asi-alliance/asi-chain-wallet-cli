@@ -126,7 +126,8 @@ mod tests {
     async fn export(messages: Vec<Value>) -> Result<Vec<Value>> {
         let frames = messages
             .into_iter()
-            .map(|msg| Ok(Message::Text(msg.to_string())));
+            .map(|msg| Message::Text(msg.to_string()))
+            .map(Ok);
         read_export_response(stream::iter(frames)).await
     }
 
