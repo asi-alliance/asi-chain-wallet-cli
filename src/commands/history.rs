@@ -16,7 +16,7 @@ pub async fn handle_get_history(config: &Config, limit: Option<u32>) -> Result<(
         !config.graphql_url.trim().is_empty(),
         "GRAPHQL_URL is required for history/export"
     );
-    let wallet = config.get_wallet()?;
+    let wallet = config.wallet_identity()?;
     let limit = limit.unwrap_or(10);
 
     println!("\n>>> Starting real-time deploy monitoring...");

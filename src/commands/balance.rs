@@ -30,7 +30,7 @@ pub async fn get_balance(config: &Config, address: &str) -> Result<Balance> {
 
 pub async fn handle_get_balance() -> Result<()> {
     let config = Config::from_env()?;
-    let wallet = config.get_wallet()?;
+    let wallet = config.wallet_identity()?;
     let token = metadata(&config).await?;
     let balance = get_balance(&config, &wallet.address).await?;
     println!("Wallet balance: {} dust", balance.dust);
