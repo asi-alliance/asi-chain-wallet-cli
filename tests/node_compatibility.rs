@@ -108,6 +108,7 @@ fn observed(id: &str) {
 /// Public balance/metadata are copied from this run's real observer.
 struct Pending {
     url: String,
+    served_ids: Arc<std::sync::Mutex<Vec<String>>>,
     stop: Arc<AtomicBool>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -127,6 +128,14 @@ impl Pending {
         listener.set_nonblocking(true).unwrap();
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
+        let served_ids = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let requested = served_ids.clone();
+        let pending = serde_json::to_string(&node_cli::f1r3fly_api::DeployFinalizationStatus {
+            state: "Pending".into(),
+            rejection_count: 0,
+            latest_block_hash: None,
+        })
+        .unwrap();
         let thread = std::thread::spawn(move || {
             while !flag.load(Ordering::Relaxed) {
                 match listener.accept() {
@@ -137,19 +146,27 @@ impl Pending {
                         let mut buffer = [0; 8192];
                         let size = stream.read(&mut buffer).unwrap_or(0);
                         let request = String::from_utf8_lossy(&buffer[..size]);
-                        let body = if request.contains("/api/status ") {
+                        let path = request.split_ascii_whitespace().nth(1).unwrap_or("");
+                        let deploy_id = path.strip_prefix("/api/deploy-finalization-status/");
+                        let body = if path == "/api/status" {
                             &meta
-                        } else if request.contains("/api/balance/") {
+                        } else if path.starts_with("/api/balance/") {
                             &balance
+                        } else if deploy_id.is_some() {
+                            &pending
                         } else {
-                            r#"{"state":"Pending","latestBlockHash":null,"rejectionCount":0}"#
+                            continue;
                         };
                         let response = format!(
                             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                             body.len(),
                             body
                         );
-                        let _ = stream.write_all(response.as_bytes());
+                        if stream.write_all(response.as_bytes()).is_ok()
+                            && let Some(id) = deploy_id
+                        {
+                            requested.lock().unwrap().push(id.to_owned());
+                        }
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         std::thread::sleep(Duration::from_millis(10))
@@ -160,6 +177,7 @@ impl Pending {
         });
         Self {
             url,
+            served_ids,
             stop,
             thread: Some(thread),
         }
@@ -269,5 +287,8 @@ fn wallet_balance_transfer_rejection_and_timeout() {
         text(&timeout)
     );
     assert!(!text(&timeout).contains("Transfer complete."));
-    observed(&deploy_id(&timeout));
+    let id = deploy_id(&timeout);
+    assert!(text(&timeout).contains(&format!("Transfer outcome unknown for deploy {id}:")));
+    assert!(pending.served_ids.lock().unwrap().contains(&id));
+    observed(&id);
 }

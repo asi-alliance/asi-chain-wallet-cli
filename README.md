@@ -186,7 +186,12 @@ cargo run -- create
 cargo run -- create --save
 ```
 
-Output includes private key, public key, and ASI address.
+Output includes the private key, public key, and ASI address. Saving a wallet requires
+a new `wallet_info.json` path. Choose another `OUTPUT_DIR` to keep several wallets.
+
+For a watch-only wallet, put the matching `public_key` and `address` in
+`wallet_info.json`. These fields are sufficient for `balance`, `history` and
+`export`. Add the matching `private_key` only on the machine that runs `send`.
 
 ### Check Balance
 
