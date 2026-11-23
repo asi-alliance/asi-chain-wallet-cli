@@ -37,6 +37,9 @@ fn send_error(id: &str, error: node_cli::Error) -> anyhow::Error {
         | node_cli::Error::ContractRejected { .. } => {
             anyhow!("Transfer failed for deploy {id}: {error}")
         }
+        node_cli::Error::DeployResultUnreadable { .. } => anyhow!(
+            "Transfer result unreadable for deploy {id}: {error}. Do not resubmit this deploy; read its result by deploy ID."
+        ),
         _ => anyhow!(
             "Transfer outcome unknown for deploy {id}: {error}. Check this deploy ID before creating another payment."
         ),
@@ -183,6 +186,25 @@ mod tests {
         let message = err.to_string();
         assert!(message.starts_with("Transfer failed for deploy original-id:"));
         assert!(message.contains(detail));
+    }
+    #[test]
+    fn a_finalized_deploy_with_an_unreadable_result_is_not_resubmitted() {
+        let err = send_error(
+            "original-id",
+            node_cli::Error::DeployResultUnreadable {
+                deploy_id: "original-id".into(),
+                block_hash: "block-hash".into(),
+                cause: Box::new(node_cli::Error::Transport {
+                    endpoint: "http://node:40403".into(),
+                    cause: node_cli::TransportError::TimedOut(std::time::Duration::from_secs(1)),
+                }),
+            },
+        );
+        let message = err.to_string();
+        assert!(message.contains("original-id"));
+        assert!(message.contains("block-hash"));
+        assert!(message.contains("Do not resubmit"));
+        assert!(!message.contains("creating another payment"));
     }
     #[test]
     fn a_contract_rejection_is_never_a_success() {

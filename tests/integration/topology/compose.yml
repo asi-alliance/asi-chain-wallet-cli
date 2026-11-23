@@ -155,8 +155,10 @@ services:
 
   # Tip reads reach validator1 over gRPC. The closed HTTP event link makes the
   # queue return its real admission refusal when the wallet submits the deploy.
+  # The queue binary is not in the older validator image, so it comes from a
+  # separate published ASI node dev build: 0380cbbd494c, image sha256:65e732bf.
   disconnected-queue:
-    image: public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:65e732bfaf26025a94216c529da8baad2049b4b561ffe0d44c3a547f0f3834c8
+    image: ${DEPLOY_QUEUE_IMAGE:-public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:65e732bfaf26025a94216c529da8baad2049b4b561ffe0d44c3a547f0f3834c8}
     entrypoint: ["/opt/docker/bin/deploy-queue"]
     command:
       - --node-grpc=http://validator1:40402

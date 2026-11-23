@@ -55,9 +55,13 @@ Check current PR status and branch revisions before starting new work.
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
 The Cargo Git dependency pins `F1R3FLY-io/rust-client` at
-`e8620a46572dbc2ec53c81f4389f5abf5c02f0b0` from branch
-`fix/node-789-admission-refusals`. [Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86)
-Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
+`dd1f182837b7c51648834fcbf88c797dd677b581`, the merge commit of
+[Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86) into
+`dev`. That merge includes `20c1402`, which resolves a landed deploy before
+reporting an admission refusal and prefers a canonical verdict over a queue
+rejection, and `6cd670a`, which keeps refusal and lookup causes for unknown
+outcomes. Its node protocol crates remain pinned to
+`0ccc315d84b32d668e8db49cd56ba3c576693e15`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
 Send checks the validator's token symbol and shard and reads its minimum Phlo
@@ -152,8 +156,15 @@ The CLI shows the original deploy ID and offers retry guidance for retryable
 refusals. A rejection after queue admission is a terminal transfer failure.
 Submission and confirmation timeouts keep the unknown-outcome warning and direct
 the operator to check the original deploy ID before creating another payment.
+A finalized deploy whose result could not be read is reported as final: read the
+result by deploy ID and do not resubmit it.
 [Node admission PR #789](https://github.com/F1R3FLY-io/f1r3node-rust/pull/789),
 [deploy queue PR #990](https://github.com/F1R3FLY-io/f1r3node-rust/pull/990)
+
+When a deploy queue fronts the validator, point both `VALIDATOR_GRPC_URL` and
+`VALIDATOR_HTTP_URL` at that queue and keep `OBSERVER_HTTP_URL` on the observer.
+Pointing only the gRPC URL at the queue sends the submission to the queue while
+status polling bypasses its local `Rejected` record and can time out.
 
 ## Compatibility baseline and tests
 
@@ -184,7 +195,11 @@ an intentionally withheld finalization verdict. A separate deploy queue forwards
 gRPC tip reads to the validator while its HTTP event link is disconnected.
 The test submits a signed transfer through that queue and checks the CLI's exit
 status, original deploy ID, refusal reason, retry guidance and recipient balance.
-Full history/export acceptance
+The queue fixture uses `DEPLOY_QUEUE_IMAGE`, defaulting to the published ASI node
+build `0380cbbd494c`
+(`public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:65e732bfaf26025a94216c529da8baad2049b4b561ffe0d44c3a547f0f3834c8`),
+because the older validator image does not ship the queue binary. Full
+history/export acceptance
 against the deployed Hasura schema remains a separate staging requirement.
 
 ## Commands
