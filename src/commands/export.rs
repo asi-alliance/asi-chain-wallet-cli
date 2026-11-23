@@ -50,6 +50,7 @@ pub async fn handle_export(
         &wallet.address,
         &wallet.public_key,
         limit,
+        config.graphql_timeout,
     )
     .await?;
 

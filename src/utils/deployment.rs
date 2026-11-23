@@ -1,8 +1,9 @@
 use crate::requests::graphql::build_recent_deployments_query;
 use crate::utils::websocket::connect_graphql_websocket;
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use chrono::{DateTime, Utc};
 use futures_util::{SinkExt, Stream, StreamExt};
+use std::time::Duration;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 
 /*     Helpers to handle GraphQL requests     */
@@ -11,13 +12,19 @@ pub async fn fetch_recent_deployments(
     address: &str,
     public_key: &str,
     limit: u32,
+    timeout: Duration,
 ) -> Result<Vec<serde_json::Value>> {
-    let (mut write, read) = connect_graphql_websocket(graphql_url).await?;
+    tokio::time::timeout(timeout, async {
+        let (mut write, read) = connect_graphql_websocket(graphql_url, timeout).await?;
 
-    let query_message = build_recent_deployments_query("init", "start", public_key, address, limit);
-    write.send(Message::Text(query_message.to_string())).await?;
+        let query_message =
+            build_recent_deployments_query("init", "start", public_key, address, limit);
+        write.send(Message::Text(query_message.to_string())).await?;
 
-    read_export_response(read).await
+        read_export_response(read).await
+    })
+    .await
+    .context("Timed out waiting for GraphQL export completion")?
 }
 
 async fn read_export_response(
@@ -28,7 +35,8 @@ async fn read_export_response(
         let text = match message.context("Reading GraphQL export response")? {
             Message::Text(text) => text,
             Message::Close(_) => break,
-            _ => continue,
+            Message::Ping(_) | Message::Pong(_) => continue,
+            _ => bail!("Expected a GraphQL text response"),
         };
         let mut response: serde_json::Value = serde_json::from_str(&text)?;
         if response["type"] == "connection_error" {
@@ -51,6 +59,14 @@ async fn read_export_response(
                     .context("GraphQL export response is missing deployments")?;
                 let mut rows: Vec<serde_json::Value> = serde_json::from_value(rows.take())
                     .context("Invalid deployments in GraphQL export response")?;
+                ensure!(
+                    rows.iter().all(|row| row.is_object()),
+                    "Invalid deployment row in GraphQL export response"
+                );
+                ensure!(
+                    deployments.is_none(),
+                    "GraphQL export returned multiple data responses for one query"
+                );
                 rows.reverse();
                 deployments = Some(rows);
             }
@@ -110,11 +126,11 @@ pub fn get_transfer_direction(from_address: &str, public_key: &str) -> &'static 
 }
 
 pub fn get_deployment_field(deployment: &serde_json::Value, field: &str, default: &str) -> String {
-    deployment
-        .get(field)
-        .and_then(|v| v.as_str())
-        .unwrap_or(default)
-        .to_string()
+    match deployment.get(field) {
+        Some(serde_json::Value::String(value)) => value.clone(),
+        Some(serde_json::Value::Number(value)) => value.to_string(),
+        _ => default.to_owned(),
+    }
 }
 
 #[cfg(test)]

@@ -28,7 +28,14 @@ pub async fn handle_get_history(config: &Config, limit: Option<u32>) -> Result<(
     let public_key = wallet.public_key.clone();
 
     // deployments with nested transfers for complete deploy history
-    subscribe_deployments(&graphql_url, &address, &public_key, limit).await?;
+    subscribe_deployments(
+        &graphql_url,
+        &address,
+        &public_key,
+        limit,
+        config.graphql_timeout,
+    )
+    .await?;
 
     Ok(())
 }
@@ -38,8 +45,9 @@ async fn subscribe_deployments(
     address: &str,
     public_key: &str,
     limit: u32,
+    timeout: std::time::Duration,
 ) -> Result<()> {
-    let (mut write, mut read) = connect_graphql_websocket(graphql_url).await?;
+    let (mut write, mut read) = connect_graphql_websocket(graphql_url, timeout).await?;
     // Query last deployments by `limit`
     let initial_message =
         build_recent_deployments_query("init", "start", public_key, address, limit);
