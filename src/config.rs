@@ -12,6 +12,7 @@ pub struct Config {
     pub output_dir: String,
     pub verbose_logs: bool,
     pub graphql_url: String,
+    pub graphql_timeout: Duration,
     pub shard_id: String,
     pub expected_token_symbol: String,
     pub max_wait: u32,
@@ -90,6 +91,7 @@ impl Config {
                 .parse()
                 .context("VERBOSE_LOGS must be true or false")?,
             graphql_url: get("GRAPHQL_URL").unwrap_or_default(),
+            graphql_timeout: Duration::from_secs(positive("GRAPHQL_TIMEOUT_SECONDS", 30)?),
             shard_id: get("SHARD_ID").unwrap_or_else(|| "root".into()),
             expected_token_symbol: get("EXPECTED_TOKEN_SYMBOL").unwrap_or_else(|| "ASI".into()),
             max_wait,
@@ -104,26 +106,32 @@ impl Config {
     }
 
     pub fn wallet_identity(&self) -> Result<WalletIdentity> {
-        let identity: WalletIdentity = self.read_wallet()?;
+        let mut identity: WalletIdentity = self.read_wallet()?;
         identity.validate()?;
         Ok(identity)
     }
 
     pub fn signing_wallet(&self) -> Result<(WalletIdentity, SigningKey)> {
-        let wallet: WalletInfo = self.read_wallet()?;
+        let mut wallet: WalletInfo = self.read_wallet()?;
         wallet.identity.validate()?;
         let key = SigningKey::from_hex(&wallet.private_key)?;
         let public = CryptoUtils::serialize_public_key(&key.public_key(), false);
         ensure!(
-            CryptoUtils::generate_vault_address(&public)? == wallet.identity.address,
-            "Wallet private key does not match its address"
+            public == wallet.identity.public_key,
+            "Wallet private key does not match its public key"
         );
         Ok((wallet.identity, key))
     }
 }
 
 impl WalletIdentity {
-    fn validate(&self) -> Result<()> {
+    fn validate(&mut self) -> Result<()> {
+        let public: secp256k1::PublicKey = self
+            .public_key
+            .parse()
+            .context("Invalid wallet public key")?;
+        // Indexer filters compare the deployer's canonical hex representation.
+        self.public_key = CryptoUtils::serialize_public_key(&public, false);
         ensure!(
             CryptoUtils::generate_vault_address(&self.public_key)? == self.address,
             "Wallet public key does not match its address"
@@ -198,12 +206,44 @@ mod tests {
     }
 
     #[test]
+    fn public_identity_rejects_invalid_curve_points_and_normalizes_indexer_keys() {
+        let (_, public) = CryptoUtils::generate_key_pair();
+        let canonical = CryptoUtils::serialize_public_key(&public, false);
+        let address = CryptoUtils::generate_vault_address(&canonical).unwrap();
+        for encoded in [
+            canonical.to_uppercase(),
+            CryptoUtils::serialize_public_key(&public, true),
+        ] {
+            let mut identity = WalletIdentity {
+                public_key: encoded,
+                address: address.clone(),
+            };
+            identity.validate().unwrap();
+            assert_eq!(identity.public_key, canonical);
+        }
+        // The address helper hashes bytes 1..65 and never validates the curve
+        // point or the SEC1 prefix. An address match alone is insufficient.
+        let mut invalid = WalletIdentity {
+            public_key: format!("05{}", &canonical[2..]),
+            address,
+        };
+        assert!(invalid.validate().is_err());
+        let invalid_public = format!("04{}", "00".repeat(64));
+        let mut invalid = WalletIdentity {
+            address: CryptoUtils::generate_vault_address(&invalid_public).unwrap(),
+            public_key: invalid_public,
+        };
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
     fn invalid_polling_budgets_fail_before_a_deploy() {
         for (key, value) in [
             ("DEPLOY_MAX_WAIT_SECONDS", "0"),
             ("DEPLOY_CHECK_INTERVAL_SECONDS", "0"),
             ("DEPLOY_CHECK_INTERVAL_SECONDS", "481"),
             ("NODE_TIMEOUT_SECONDS", "0"),
+            ("GRAPHQL_TIMEOUT_SECONDS", "0"),
         ] {
             let mut env = values();
             env.insert(key, value.into());
