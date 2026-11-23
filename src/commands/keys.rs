@@ -26,6 +26,19 @@ pub fn handle_create_wallet(save: bool) -> Result<()> {
         temporary
             .persist_noclobber(&wallet_file)
             .with_context(|| format!("Could not save a new wallet at {}", wallet_file.display()))?;
+        // Sync bottom-up: publishing the file and creating a nested OUTPUT_DIR
+        // both change directory entries that the file's fsync cannot persist.
+        #[cfg(unix)]
+        for ancestor in output_dir.ancestors() {
+            let directory = if ancestor.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                ancestor
+            };
+            fs::File::open(directory)?.sync_all().with_context(|| {
+                format!("Could not persist wallet directory {}", directory.display())
+            })?;
+        }
     }
 
     println!("✔ Wallet created successfully!");
