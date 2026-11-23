@@ -41,14 +41,15 @@ impl Node {
     /// First published port of the node's block; the node's own offsets give
     /// the rest, so the whole map is one number per node.
     fn base_port(self) -> u16 {
-        match self {
-            Node::Boot => 40400,
-            Node::Validator1 => 40410,
-            Node::Validator2 => 40420,
-            Node::Validator3 => 40430,
-            Node::Validator4 => 40440,
-            Node::ReadOnly => 40450,
-        }
+        port_base()
+            + match self {
+                Node::Boot => 0,
+                Node::Validator1 => 10,
+                Node::Validator2 => 20,
+                Node::Validator3 => 30,
+                Node::Validator4 => 40,
+                Node::ReadOnly => 50,
+            }
     }
 
     pub fn grpc_port(self) -> u16 {
@@ -96,4 +97,20 @@ pub fn get_json(url: &str) -> Option<serde_json::Value> {
             .await
             .ok()
     })
+}
+
+/// Override only host ports; container ports and the node image stay unchanged.
+pub fn port_base() -> u16 {
+    let port = std::env::var("FIREFLY_PORT_BASE")
+        .map(|value| {
+            value
+                .parse::<u16>()
+                .expect("FIREFLY_PORT_BASE must be a port")
+        })
+        .unwrap_or(40400);
+    assert!(
+        (1024..=u16::MAX - 62).contains(&port),
+        "FIREFLY_PORT_BASE must leave room for 63 unprivileged ports"
+    );
+    port
 }

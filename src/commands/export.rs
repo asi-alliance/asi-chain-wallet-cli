@@ -37,7 +37,7 @@ pub async fn handle_export(
         !config.graphql_url.trim().is_empty(),
         "GRAPHQL_URL is required for history/export"
     );
-    let wallet = config.get_wallet()?;
+    let wallet = config.wallet_identity()?;
     let limit = limit.unwrap_or(100);
 
     println!("\n>>> Exporting wallet data...");
@@ -50,6 +50,7 @@ pub async fn handle_export(
         &wallet.address,
         &wallet.public_key,
         limit,
+        config.graphql_timeout,
     )
     .await?;
 
