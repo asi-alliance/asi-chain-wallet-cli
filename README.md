@@ -28,6 +28,7 @@ Part of the [**Artificial Superintelligence Alliance**](https://superintelligenc
 7. [Project Structure](#project-structure)
 8. [Contributing](#contributing)
 9. [Branch status and client dependency](#branch-status-and-client-dependency)
+10. [Compatibility baseline and tests](#compatibility-baseline-and-tests)
 
 ---
 
@@ -124,6 +125,7 @@ EXPECTED_TOKEN_SYMBOL=ASI
 SHARD_ID=root
 VERBOSE_LOGS=false
 GRAPHQL_URL=wss://your-gateway.example/v1/graphql
+GRAPHQL_TIMEOUT_SECONDS=30
 ```
 
 These loopback ports illustrate a locally mapped validator/observer; use the
@@ -135,6 +137,14 @@ Legacy `VALIDATOR_HOST` plus `VALIDATOR_GRPC_PORT` / `VALIDATOR_HTTP_PORT`
 remain supported when URLs are absent. For the observer, supply
 `OBSERVER_HTTP_URL` or `OBSERVER_HOST` plus **`OBSERVER_HTTP_PORT`** explicitly.
 `OBSERVER_GRPC_PORT` is no longer used. HTTP ports are never inferred from gRPC.
+
+`GRAPHQL_TIMEOUT_SECONDS` defaults to 30 and must be positive. It bounds the
+WebSocket connection/acknowledgement and the entire export query, including
+completion. It does not limit the lifetime of an established history subscription.
+Export connection/operation errors, payload errors, invalid responses and premature
+termination exit non-zero before creating or overwriting an export file.
+History and JSON/CSV exports preserve integer dust amounts, including uint256
+values returned as JSON numbers or decimal strings.
 
 `GRAPHQL_URL` is needed only for history/export. Its schema/permissions must
 match the selected indexer/Hasura release; do not put admin credentials into a
@@ -163,14 +173,24 @@ The last command requires Docker and creates its own shard with fresh test
 keys/state. The wallet owns the fixture helpers in `tests/support`, copied from
 the pinned client revision under Apache-2.0, and the topology in
 `tests/integration/topology`. Both the harness default and CI select the immutable
-node image documented above. Loopback ports 40400-40462 must be free; an existing
+node image documented above. Loopback ports 40400-40462 must be free (set
+`FIREFLY_PORT_BASE`, e.g. `41400`, to use another host port range); an existing
 `rust-client-it` project causes refusal before any cleanup. Only its freshly
 created shard is torn down. No node build or existing genesis change is performed.
 
-See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
-The wallet command test checks exact balances/transfers, vault rejection and
-an intentionally withheld finalization verdict. Full history/export acceptance
-against the deployed Hasura schema remains a separate staging requirement.
+`tests/wallet_creation.rs` checks exclusive saves, concurrent creators, Unix
+permissions and symlink destinations. `tests/wallet_reads.rs` runs the CLI against
+loopback HTTP/GraphQL responders: public-only and empty-private-key reads, signing
+refusal, exact JSON/CSV exports, genuine empty results, errors and deadlines.
+These tests run with `cargo test --release --locked` without Docker or a live network.
+
+`tests/node_compatibility.rs` checks exact balances/transfers and vault rejection
+on the isolated shard. Its timeout fixture serializes the pinned client's typed
+`Pending` response and verifies that both polling endpoints served it for the
+original deploy ID, which remains available in the timeout error.
+Full history/export acceptance against the deployed Hasura schema remains a
+separate staging requirement under
+[issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
 
 ## Commands
 
@@ -188,10 +208,16 @@ cargo run -- create --save
 
 Output includes the private key, public key, and ASI address. Saving a wallet requires
 a new `wallet_info.json` path. Choose another `OUTPUT_DIR` to keep several wallets.
+On Unix, the wallet is created with owner-only permissions; the file and directory
+entries are synced before success is reported. A failed save never prints the new
+private key or replaces an existing wallet.
 
 For a watch-only wallet, put the matching `public_key` and `address` in
 `wallet_info.json`. These fields are sufficient for `balance`, `history` and
-`export`. Add the matching `private_key` only on the machine that runs `send`.
+`export`; `private_key` may be omitted or empty. Public keys are validated and
+normalized to lowercase uncompressed hex before indexer queries. Add the matching
+`private_key` only on the machine that runs `send`, which checks that the private
+key, public key and address match.
 
 ### Check Balance
 
@@ -263,6 +289,9 @@ cargo run -- export --format csv --output reports/wallet_2024.csv --limit 200
 ```
 
 Exported files are saved to the `exports/` directory by default with timestamp-based filenames.
+An empty deployments array followed by operation completion exits successfully,
+prints "No deployments found" and creates no export file. Errors or a missing
+completion fail the command; an existing output file is preserved on these failures.
 
 ### Help
 
@@ -333,7 +362,13 @@ asi-chain-wallet-cli/
 │   └── utils/
 │       ├── deployment.rs   # Deployment utilities
 │       └── websocket.rs    # WebSocket connection
-└── tests/support/          # Wallet-owned node test fixtures
+└── tests/
+    ├── exact_http.rs       # Pinned-client HTTP parsing checks
+    ├── wallet_creation.rs  # Safe wallet persistence regressions
+    ├── wallet_reads.rs     # Watch-only and GraphQL CLI regressions
+    ├── node_compatibility.rs # Isolated-node transfer and timeout checks
+    ├── support/            # Wallet-owned node test fixtures
+    └── integration/topology/ # Docker Compose test shard
 ```
 
 ## Contributing
