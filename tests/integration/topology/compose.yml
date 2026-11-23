@@ -51,10 +51,10 @@ services:
       - --ceremony-master-mode
       - --heartbeat-disabled
     ports:
-      - "127.0.0.1:40400:40400"
-      - "127.0.0.1:40401:40401"
-      - "127.0.0.1:40402:40402"
-      - "127.0.0.1:40403:40403"
+      - "127.0.0.1:${IT_PORT_40400:-40400}:40400"
+      - "127.0.0.1:${IT_PORT_40401:-40401}:40401"
+      - "127.0.0.1:${IT_PORT_40402:-40402}:40402"
+      - "127.0.0.1:${IT_PORT_40403:-40403}:40403"
     volumes:
       # Every other node dials the node ID derived from this key, so the
       # bootstrap's identity is set by the harness rather than at startup.
@@ -76,10 +76,10 @@ services:
       - --allow-private-addresses
       - --genesis-validator
     ports:
-      - "127.0.0.1:40410:40400"
-      - "127.0.0.1:40411:40401"
-      - "127.0.0.1:40412:40402"
-      - "127.0.0.1:40413:40403"
+      - "127.0.0.1:${IT_PORT_40410:-40410}:40400"
+      - "127.0.0.1:${IT_PORT_40411:-40411}:40401"
+      - "127.0.0.1:${IT_PORT_40412:-40412}:40402"
+      - "127.0.0.1:${IT_PORT_40413:-40413}:40403"
     volumes:
       - ${IT_SHARD_DIR}/conf/validator1.conf:/var/lib/f1r3fly/node.conf:ro
       - ${IT_SHARD_DIR}/genesis/bonds.txt:/var/lib/f1r3fly/genesis/bonds.txt:ro
@@ -98,10 +98,10 @@ services:
       - --allow-private-addresses
       - --genesis-validator
     ports:
-      - "127.0.0.1:40420:40400"
-      - "127.0.0.1:40421:40401"
-      - "127.0.0.1:40422:40402"
-      - "127.0.0.1:40423:40403"
+      - "127.0.0.1:${IT_PORT_40420:-40420}:40400"
+      - "127.0.0.1:${IT_PORT_40421:-40421}:40401"
+      - "127.0.0.1:${IT_PORT_40422:-40422}:40402"
+      - "127.0.0.1:${IT_PORT_40423:-40423}:40403"
     volumes:
       - ${IT_SHARD_DIR}/conf/validator2.conf:/var/lib/f1r3fly/node.conf:ro
       - ${IT_SHARD_DIR}/genesis/bonds.txt:/var/lib/f1r3fly/genesis/bonds.txt:ro
@@ -120,10 +120,10 @@ services:
       - --allow-private-addresses
       - --genesis-validator
     ports:
-      - "127.0.0.1:40430:40400"
-      - "127.0.0.1:40431:40401"
-      - "127.0.0.1:40432:40402"
-      - "127.0.0.1:40433:40403"
+      - "127.0.0.1:${IT_PORT_40430:-40430}:40400"
+      - "127.0.0.1:${IT_PORT_40431:-40431}:40401"
+      - "127.0.0.1:${IT_PORT_40432:-40432}:40402"
+      - "127.0.0.1:${IT_PORT_40433:-40433}:40403"
     volumes:
       - ${IT_SHARD_DIR}/conf/validator3.conf:/var/lib/f1r3fly/node.conf:ro
       - ${IT_SHARD_DIR}/genesis/bonds.txt:/var/lib/f1r3fly/genesis/bonds.txt:ro
@@ -144,10 +144,10 @@ services:
       - --allow-private-addresses
       - --heartbeat-disabled
     ports:
-      - "127.0.0.1:40450:40400"
-      - "127.0.0.1:40451:40401"
-      - "127.0.0.1:40452:40402"
-      - "127.0.0.1:40453:40403"
+      - "127.0.0.1:${IT_PORT_40450:-40450}:40400"
+      - "127.0.0.1:${IT_PORT_40451:-40451}:40401"
+      - "127.0.0.1:${IT_PORT_40452:-40452}:40402"
+      - "127.0.0.1:${IT_PORT_40453:-40453}:40403"
     volumes:
       - ./node.conf:/var/lib/f1r3fly/node.conf:ro
       - ${IT_SHARD_DIR}/genesis/bonds.txt:/var/lib/f1r3fly/genesis/bonds.txt:ro
@@ -166,10 +166,10 @@ services:
       - *bootstrap
       - --allow-private-addresses
     ports:
-      - "127.0.0.1:40440:40400"
-      - "127.0.0.1:40441:40401"
-      - "127.0.0.1:40442:40402"
-      - "127.0.0.1:40443:40403"
+      - "127.0.0.1:${IT_PORT_40440:-40440}:40400"
+      - "127.0.0.1:${IT_PORT_40441:-40441}:40401"
+      - "127.0.0.1:${IT_PORT_40442:-40442}:40402"
+      - "127.0.0.1:${IT_PORT_40443:-40443}:40403"
     volumes:
       - ${IT_SHARD_DIR}/conf/validator4.conf:/var/lib/f1r3fly/node.conf:ro
       - ${IT_SHARD_DIR}/genesis/bonds.txt:/var/lib/f1r3fly/genesis/bonds.txt:ro
@@ -187,9 +187,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ${IT_SHARD_DIR}/tls:/tls:ro
     ports:
-      - "127.0.0.1:40460:40460"
-      - "127.0.0.1:40461:40461"
-      - "127.0.0.1:40462:40462"
+      - "127.0.0.1:${IT_PORT_40460:-40460}:40460"
+      - "127.0.0.1:${IT_PORT_40461:-40461}:40461"
+      - "127.0.0.1:${IT_PORT_40462:-40462}:40462"
 
 networks:
   shard:

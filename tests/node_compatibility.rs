@@ -37,9 +37,16 @@ fn wallet(key: &keys::Key, args: &[&str], extra: &[(&str, &str)]) -> Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_asi-chain-wallet-cli"));
     for (name, _) in std::env::vars_os() {
         let n = name.to_string_lossy();
-        if ["VALIDATOR_", "OBSERVER_", "NODE_", "EXPECTED_", "DEPLOY_"]
-            .iter()
-            .any(|p| n.starts_with(p))
+        if [
+            "VALIDATOR_",
+            "OBSERVER_",
+            "NODE_",
+            "EXPECTED_",
+            "DEPLOY_",
+            "GRAPHQL_",
+        ]
+        .iter()
+        .any(|p| n.starts_with(p))
             || ["SHARD_ID", "OUTPUT_DIR", "GRAPHQL_URL", "VERBOSE_LOGS"].contains(&n.as_ref())
         {
             cmd.env_remove(name);
@@ -289,6 +296,28 @@ fn wallet_balance_transfer_rejection_and_timeout() {
     assert!(!text(&timeout).contains("Transfer complete."));
     let id = deploy_id(&timeout);
     assert!(text(&timeout).contains(&format!("Transfer outcome unknown for deploy {id}:")));
-    assert!(pending.served_ids.lock().unwrap().contains(&id));
+    let expected = node_cli::Error::FinalizationTimeout {
+        deploy_id: id.clone(),
+        waited: Duration::from_secs(1),
+        execution: None,
+    };
+    assert!(
+        text(&timeout).contains(&expected.to_string()),
+        "{}",
+        text(&timeout)
+    );
+    let served_ids = pending.served_ids.clone();
+    // Join the responder before inspecting its completed writes.
+    drop(pending);
+    assert_eq!(
+        served_ids
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|served| *served == &id)
+            .count(),
+        2,
+        "both validator and observer must serve valid Pending observations"
+    );
     observed(&id);
 }

@@ -22,6 +22,22 @@ impl Shard {
     /// Pull the node image, start the shard, and wait for every node to
     /// finalize past [`READY_HEIGHT`].
     pub fn start() -> Result<Self, String> {
+        let base = super::node::port_base();
+        for offset in (0..=3)
+            .chain(10..=13)
+            .chain(20..=23)
+            .chain(30..=33)
+            .chain(40..=43)
+            .chain(50..=53)
+            .chain(60..=62)
+        {
+            std::net::TcpListener::bind(("127.0.0.1", base + offset)).map_err(|e| {
+                format!(
+                    "integration port {} is unavailable ({e}); choose FIREFLY_PORT_BASE",
+                    base + offset
+                )
+            })?;
+        }
         let topology = topology_dir();
         let keep = std::env::var_os("FIREFLY_KEEP_SHARD").is_some();
         let shard = Shard { topology, keep };
@@ -219,8 +235,15 @@ fn write_shard_files(dir: &Path, topology: &Path) -> Result<(), String> {
     write(
         dir.join("shard.env"),
         &format!(
-            "IT_SHARD_DIR={}\nIT_BOOT_NODE_ID={boot_node_id}\n",
-            dir.display()
+            "IT_SHARD_DIR={}\nIT_BOOT_NODE_ID={boot_node_id}\n{}",
+            dir.display(),
+            (0..=62)
+                .map(|offset| format!(
+                    "IT_PORT_{}={}\n",
+                    40400 + offset,
+                    super::node::port_base() + offset
+                ))
+                .collect::<String>()
         ),
     )
 }
