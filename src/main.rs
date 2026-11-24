@@ -30,6 +30,10 @@ pub enum Commands {
 
         #[arg(short, long)]
         amount: String,
+
+        /// On a deployer-share refusal, wait and resend the same signed transfer once.
+        #[arg(long)]
+        retry_deployer_share: bool,
     },
 
     #[command(visible_alias = "hist")]
@@ -73,7 +77,11 @@ async fn main() -> ExitCode {
     let result = match &cli.command {
         Some(Commands::Create { save }) => handle_create_wallet(*save),
         Some(Commands::Balance {}) => handle_get_balance().await,
-        Some(Commands::Send { to, amount }) => handle_send(to, amount).await,
+        Some(Commands::Send {
+            to,
+            amount,
+            retry_deployer_share,
+        }) => handle_send(to, amount, *retry_deployer_share).await,
         Some(Commands::History { limit }) => handle_get_history(&config, *limit).await,
         Some(Commands::Export {
             format,

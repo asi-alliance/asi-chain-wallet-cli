@@ -55,9 +55,13 @@ Check current PR status and branch revisions before starting new work.
 | `fix/asi-client-029-node-046` | Source of merged [#6](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/6), candidate `8f6c20e` | Historical review/image source; continue development from dev. |
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
-The Cargo Git dependency uses ASI client 0.3.0 pinned to
-[`9292f5433b4d727d9a226f2f5766dfd088e14948`](https://github.com/asi-alliance/asi-chain-client/commit/9292f5433b4d727d9a226f2f5766dfd088e14948).
-Its node protocol crates remain pinned to `0ccc315d84b32d668e8db49cd56ba3c576693e15`.
+The Cargo Git dependency pins `F1R3FLY-io/rust-client` at
+`2fedf97e66a56b7a0b4cce06eb546d36c221b58e`, the `dev` merge of
+[Rust client PR #103](https://github.com/F1R3FLY-io/rust-client/pull/103).
+It reads structured gRPC queue causes and supports legacy queue messages.
+It includes the refusal reconciliation and verdict handling from
+[Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86).
+Its node protocol crates are pinned to `aca631e2ed02f73170558fbc3194efa48b9f1876`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
 Send checks the validator's token symbol and shard and reads its minimum Phlo
@@ -154,6 +158,23 @@ public URL. Secure WebSocket (`wss`) transport is enabled.
 `DEPLOY_CHECK_INTERVAL_SECONDS` to 5. Both must be positive; the poll interval
 must not exceed the total wait budget.
 
+## Deploy admission refusals
+
+The client reports explicit refusals from node admission and from the deploy queue.
+The CLI shows the original deploy ID and offers retry guidance for retryable
+refusals. A rejection after queue admission is a terminal transfer failure.
+Submission and confirmation timeouts keep the unknown-outcome warning and direct
+the operator to check the original deploy ID before creating another payment.
+A finalized deploy whose result could not be read is reported as final: read the
+result by deploy ID and do not resubmit it.
+[Node admission PR #789](https://github.com/F1R3FLY-io/f1r3node-rust/pull/789),
+[deploy queue PR #990](https://github.com/F1R3FLY-io/f1r3node-rust/pull/990)
+
+When a deploy queue fronts the validator, point both `VALIDATOR_GRPC_URL` and
+`VALIDATOR_HTTP_URL` at that queue and keep `OBSERVER_HTTP_URL` on the observer.
+Pointing only the gRPC URL at the queue sends the submission to the queue while
+status polling bypasses its local `Rejected` record and can time out.
+
 ## Compatibility baseline and tests
 
 The candidate uses the exact client/node pins above, the root Cargo.lock and
@@ -178,19 +199,18 @@ node image documented above. Loopback ports 40400-40462 must be free (set
 `rust-client-it` project causes refusal before any cleanup. Only its freshly
 created shard is torn down. No node build or existing genesis change is performed.
 
-`tests/wallet_creation.rs` checks exclusive saves, concurrent creators, Unix
-permissions and symlink destinations. `tests/wallet_reads.rs` runs the CLI against
-loopback HTTP/GraphQL responders: public-only and empty-private-key reads, signing
-refusal, exact JSON/CSV exports, genuine empty results, errors and deadlines.
-These tests run with `cargo test --release --locked` without Docker or a live network.
-
-`tests/node_compatibility.rs` checks exact balances/transfers and vault rejection
-on the isolated shard. Its timeout fixture serializes the pinned client's typed
-`Pending` response and verifies that both polling endpoints served it for the
-original deploy ID, which remains available in the timeout error.
-Full history/export acceptance against the deployed Hasura schema remains a
-separate staging requirement under
-[issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
+See [issue #5](https://github.com/asi-alliance/asi-chain-wallet-cli/issues/5).
+The wallet command test checks exact balances/transfers, vault rejection and
+an intentionally withheld finalization verdict. A separate deploy queue forwards
+gRPC tip reads to the validator while its HTTP event link is disconnected.
+The test submits a signed transfer through that queue and checks the CLI's exit
+status, original deploy ID, refusal reason, retry guidance and recipient balance.
+The queue fixture uses `DEPLOY_QUEUE_IMAGE`, defaulting to the published ASI node
+build `0380cbbd494c`
+(`public.ecr.aws/l2u2v4a8/asi-chain/node-rust@sha256:65e732bfaf26025a94216c529da8baad2049b4b561ffe0d44c3a547f0f3834c8`),
+because the older validator image does not ship the queue binary. Full
+history/export acceptance
+against the deployed Hasura schema remains a separate staging requirement.
 
 ## Commands
 
@@ -236,6 +256,17 @@ Transfer tokens to another address:
 ```bash
 cargo run -- send --to <recipient-address> --amount <amount>
 ```
+
+`send` submits the signed transfer once by default. To allow one retry of the
+same signed bytes within this invocation, add `--retry-deployer-share`. The
+CLI waits for the queue's `retry-after` only when the queue identifies the
+sender's share limit and the wait fits before expiration. A second refusal
+ends the command. Starting a new `send` signs a different deploy.
+
+For validator capacity, validator inactivity, shard finality or storage
+pressure, the CLI prints the cause and any wait. After the wait a new transfer
+needs a current block height. An unknown cause produces a generic queue-full
+refusal. For an unknown submission outcome, check the original deploy ID.
 
 **Example:**
 

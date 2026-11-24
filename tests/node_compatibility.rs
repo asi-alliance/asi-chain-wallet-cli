@@ -141,6 +141,8 @@ impl Pending {
             state: "Pending".into(),
             rejection_count: 0,
             latest_block_hash: None,
+            queue_state: None,
+            detail: None,
         })
         .unwrap();
         let thread = std::thread::spawn(move || {
@@ -235,6 +237,32 @@ fn wallet_balance_transfer_rejection_and_timeout() {
     assert!(!zero.status.success());
     assert!(!text(&zero).contains("Deploy ID:"));
     let before = balance(&keys::TRANSFER_RECIPIENT);
+    let refused = wallet(
+        &keys::TRANSFER_SENDER,
+        &[
+            "send",
+            "--to",
+            &keys::TRANSFER_RECIPIENT.address,
+            "--amount",
+            "1",
+        ],
+        &[(
+            "VALIDATOR_GRPC_URL",
+            &format!("http://127.0.0.1:{}", common::node::port_base() + 14),
+        )],
+    );
+    let message = text(&refused);
+    assert!(!refused.status.success(), "{message}");
+    let id = deploy_id(&refused);
+    assert!(!id.is_empty());
+    assert!(
+        message.contains(&format!("Transfer not accepted for deploy {id}:")),
+        "{message}"
+    );
+    assert!(message.contains("node_unavailable"), "{message}");
+    assert!(message.contains("Please try again later"), "{message}");
+    assert_eq!(balance(&keys::TRANSFER_RECIPIENT), before);
+
     let amount = "9007199254740993";
     let sent = wallet(
         &keys::TRANSFER_SENDER,

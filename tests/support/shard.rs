@@ -24,7 +24,7 @@ impl Shard {
     pub fn start() -> Result<Self, String> {
         let base = super::node::port_base();
         for offset in (0..=3)
-            .chain(10..=13)
+            .chain(10..=14)
             .chain(20..=23)
             .chain(30..=33)
             .chain(40..=43)

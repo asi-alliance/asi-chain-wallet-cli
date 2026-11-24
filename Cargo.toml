@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-node_cli = { git = "https://github.com/asi-alliance/asi-chain-client.git", rev = "9292f5433b4d727d9a226f2f5766dfd088e14948", default-features = false }
+node_cli = { git = "https://github.com/F1R3FLY-io/rust-client.git", rev = "2fedf97e66a56b7a0b4cce06eb546d36c221b58e", default-features = false }
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -31,6 +31,7 @@ name = "node_compatibility"
 required-features = ["integration"]
 
 [dev-dependencies]
+axum = { version = "0.8", default-features = false, features = ["http2", "tokio"] }
 rcgen = "0.13"
 sha3 = "0.10.8"
 hex = "0.4"
