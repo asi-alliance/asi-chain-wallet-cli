@@ -2,7 +2,7 @@ use anyhow::{Context, Result, ensure};
 use node_cli::{Endpoint, SigningKey, utils::CryptoUtils};
 use std::{env, fs, path::Path, time::Duration};
 
-use crate::models::WalletInfo;
+use crate::models::{WalletIdentity, WalletInfo};
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -12,6 +12,7 @@ pub struct Config {
     pub output_dir: String,
     pub verbose_logs: bool,
     pub graphql_url: String,
+    pub graphql_timeout: Duration,
     pub shard_id: String,
     pub expected_token_symbol: String,
     pub max_wait: u32,
@@ -90,6 +91,7 @@ impl Config {
                 .parse()
                 .context("VERBOSE_LOGS must be true or false")?,
             graphql_url: get("GRAPHQL_URL").unwrap_or_default(),
+            graphql_timeout: Duration::from_secs(positive("GRAPHQL_TIMEOUT_SECONDS", 30)?),
             shard_id: get("SHARD_ID").unwrap_or_else(|| "root".into()),
             expected_token_symbol: get("EXPECTED_TOKEN_SYMBOL").unwrap_or_else(|| "ASI".into()),
             max_wait,
@@ -97,29 +99,45 @@ impl Config {
         })
     }
 
-    pub fn get_wallet(&self) -> Result<WalletInfo> {
-        let wallet_file = Path::new(&self.output_dir).join("wallet_info.json");
-        let json = fs::read_to_string(&wallet_file)
-            .with_context(|| format!("Failed to read {}", wallet_file.display()))?;
-        let wallet: WalletInfo = serde_json::from_str(&json).context("Invalid wallet_info.json")?;
-        validate_wallet(&wallet)?;
-        Ok(wallet)
+    fn read_wallet<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
+        let path = Path::new(&self.output_dir).join("wallet_info.json");
+        let json = fs::read(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        serde_json::from_slice(&json).context("Invalid wallet_info.json")
+    }
+
+    pub fn wallet_identity(&self) -> Result<WalletIdentity> {
+        let mut identity: WalletIdentity = self.read_wallet()?;
+        identity.validate()?;
+        Ok(identity)
+    }
+
+    pub fn signing_wallet(&self) -> Result<(WalletIdentity, SigningKey)> {
+        let mut wallet: WalletInfo = self.read_wallet()?;
+        wallet.identity.validate()?;
+        let key = SigningKey::from_hex(&wallet.private_key)?;
+        let public = CryptoUtils::serialize_public_key(&key.public_key(), false);
+        ensure!(
+            public == wallet.identity.public_key,
+            "Wallet private key does not match its public key"
+        );
+        Ok((wallet.identity, key))
     }
 }
 
-pub fn validate_wallet(wallet: &WalletInfo) -> Result<()> {
-    let key = SigningKey::from_hex(&wallet.private_key)?;
-    let public = CryptoUtils::serialize_public_key(&key.public_key(), false);
-    let derived = CryptoUtils::generate_vault_address(&public)?;
-    ensure!(
-        derived == wallet.address,
-        "Wallet private key does not match its address"
-    );
-    ensure!(
-        CryptoUtils::generate_vault_address(&wallet.public_key)? == derived,
-        "Wallet public key does not match its address"
-    );
-    Ok(())
+impl WalletIdentity {
+    fn validate(&mut self) -> Result<()> {
+        let public: secp256k1::PublicKey = self
+            .public_key
+            .parse()
+            .context("Invalid wallet public key")?;
+        // Indexer filters compare the deployer's canonical hex representation.
+        self.public_key = CryptoUtils::serialize_public_key(&public, false);
+        ensure!(
+            CryptoUtils::generate_vault_address(&self.public_key)? == self.address,
+            "Wallet public key does not match its address"
+        );
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -155,12 +173,77 @@ mod tests {
         assert!(Config::from_lookup(|k| env.get(k).cloned()).is_ok());
     }
     #[test]
+    fn watch_only_wallet_loads_public_identity_but_signing_requires_matching_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut env = values();
+        env.insert("OUTPUT_DIR", dir.path().to_str().unwrap().into());
+        let config = Config::from_lookup(|k| env.get(k).cloned()).unwrap();
+        let (secret, public) = CryptoUtils::generate_key_pair();
+        let public = CryptoUtils::serialize_public_key(&public, false);
+        let address = CryptoUtils::generate_vault_address(&public).unwrap();
+        let path = dir.path().join("wallet_info.json");
+        let mut record = serde_json::json!({"public_key": public, "address": address});
+        let write = |data: &serde_json::Value| fs::write(&path, data.to_string()).unwrap();
+        write(&record);
+        assert_eq!(config.wallet_identity().unwrap().address, address);
+        assert!(config.signing_wallet().is_err());
+        record["private_key"] = "".into();
+        write(&record);
+        assert!(config.wallet_identity().is_ok());
+        assert!(config.signing_wallet().is_err());
+
+        record["private_key"] = CryptoUtils::serialize_private_key(&secret).into();
+        write(&record);
+        assert!(config.signing_wallet().is_ok());
+        let (other, _) = CryptoUtils::generate_key_pair();
+        record["private_key"] = CryptoUtils::serialize_private_key(&other).into();
+        write(&record);
+        assert!(config.signing_wallet().is_err());
+        record["address"] = "incorrect".into();
+        write(&record);
+        assert!(config.wallet_identity().is_err());
+        assert!(config.signing_wallet().is_err());
+    }
+
+    #[test]
+    fn public_identity_rejects_invalid_curve_points_and_normalizes_indexer_keys() {
+        let (_, public) = CryptoUtils::generate_key_pair();
+        let canonical = CryptoUtils::serialize_public_key(&public, false);
+        let address = CryptoUtils::generate_vault_address(&canonical).unwrap();
+        for encoded in [
+            canonical.to_uppercase(),
+            CryptoUtils::serialize_public_key(&public, true),
+        ] {
+            let mut identity = WalletIdentity {
+                public_key: encoded,
+                address: address.clone(),
+            };
+            identity.validate().unwrap();
+            assert_eq!(identity.public_key, canonical);
+        }
+        // The address helper hashes bytes 1..65 and never validates the curve
+        // point or the SEC1 prefix. An address match alone is insufficient.
+        let mut invalid = WalletIdentity {
+            public_key: format!("05{}", &canonical[2..]),
+            address,
+        };
+        assert!(invalid.validate().is_err());
+        let invalid_public = format!("04{}", "00".repeat(64));
+        let mut invalid = WalletIdentity {
+            address: CryptoUtils::generate_vault_address(&invalid_public).unwrap(),
+            public_key: invalid_public,
+        };
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
     fn invalid_polling_budgets_fail_before_a_deploy() {
         for (key, value) in [
             ("DEPLOY_MAX_WAIT_SECONDS", "0"),
             ("DEPLOY_CHECK_INTERVAL_SECONDS", "0"),
             ("DEPLOY_CHECK_INTERVAL_SECONDS", "481"),
             ("NODE_TIMEOUT_SECONDS", "0"),
+            ("GRAPHQL_TIMEOUT_SECONDS", "0"),
         ] {
             let mut env = values();
             env.insert(key, value.into());

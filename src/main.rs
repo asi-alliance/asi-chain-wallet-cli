@@ -6,7 +6,7 @@ mod utils;
 
 use clap::{Parser, Subcommand};
 use commands::*;
-use std::process;
+use std::process::ExitCode;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -58,7 +58,7 @@ impl Cli {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     dotenv::dotenv().ok();
 
     let cli = Cli::parse();
@@ -66,7 +66,7 @@ async fn main() {
         Ok(cfg) => cfg,
         Err(e) => {
             eprintln!("Error loading configuration: {}", e);
-            process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
 
@@ -87,7 +87,11 @@ async fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {}", e);
-        process::exit(1);
+        eprintln!("Error: {e:#}");
+        // Return normally so errors that own resources (e.g. PersistError's
+        // temporary wallet file) are dropped before the process exits.
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

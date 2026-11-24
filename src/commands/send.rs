@@ -1,7 +1,7 @@
 use crate::balance::{get_balance, metadata, metadata_at};
 use crate::config::Config;
 use anyhow::{Result, anyhow, ensure};
-use node_cli::{ConnectionConfig, DeployOptions, F1r3flyConnectionManager, SigningKey};
+use node_cli::{ConnectionConfig, DeployOptions, F1r3flyConnectionManager};
 use num_bigint::BigUint;
 
 fn transfer_amount(value: &str) -> Result<BigUint> {
@@ -50,7 +50,7 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
     let amount = transfer_amount(value)?;
     node_cli::vault::validate_address(to)?;
     let config = Config::from_env()?;
-    let wallet = config.get_wallet()?;
+    let (wallet, key) = config.signing_wallet()?;
     let token = metadata(&config).await?;
     let validator = metadata_at(&config, &config.validator_http).await?;
     let balance = get_balance(&config, &wallet.address).await?;
@@ -58,7 +58,6 @@ pub async fn handle_send(to: &str, value: &str) -> Result<()> {
         balance.dust >= amount,
         "Insufficient balance to complete the transfer"
     );
-    let key = SigningKey::from_hex(&wallet.private_key)?;
     let mut connection = ConnectionConfig::new(
         config.validator_grpc.clone(),
         config.validator_http.clone(),
