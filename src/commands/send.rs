@@ -168,6 +168,7 @@ mod tests {
 
         for (cause, wait, opted_in, expected_calls) in [
             ("deployer_share", Some("1"), true, 2),
+            ("", Some("1"), true, 2),
             ("deployer_share", Some("0"), false, 1),
             ("deployer_share", None, true, 1),
             ("deployer_share", Some("3600"), true, 1),
@@ -186,6 +187,10 @@ mod tests {
                         let mut headers = HeaderMap::new();
                         headers.insert("content-type", "application/grpc".parse().unwrap());
                         headers.insert("grpc-status", "8".parse().unwrap());
+                        headers.insert(
+                            "grpc-message",
+                            "deploy queue is full for this deployer".parse().unwrap(),
+                        );
                         headers.insert("cause", cause.parse().unwrap());
                         if let Some(wait) = wait {
                             headers.insert("retry-after", wait.parse().unwrap());
@@ -216,10 +221,18 @@ mod tests {
             let message = send_error(&signed.id(), error).to_string();
             assert!(message.contains(&signed.id()), "{message}");
             assert!(message.contains("deploy_queue_full"), "{message}");
-            if cause == "future" {
-                assert!(!message.contains("Cause:"), "{message}");
+            let reported_cause = match cause {
+                "future" => None,
+                "" => Some("deployer_share"),
+                value => Some(value),
+            };
+            if let Some(reported_cause) = reported_cause {
+                assert!(
+                    message.contains(&format!("Cause: {reported_cause}.")),
+                    "{message}"
+                );
             } else {
-                assert!(message.contains(&format!("Cause: {cause}.")), "{message}");
+                assert!(!message.contains("Cause:"), "{message}");
             }
             if let Some(wait) = wait {
                 assert!(
