@@ -56,7 +56,7 @@ Check current PR status and branch revisions before starting new work.
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
 The Cargo Git dependency pins `F1R3FLY-io/rust-client` at
-`ff96dadf20201f7326e75b1d55e35313b04425cc` from
+`2fedf97e66a56b7a0b4cce06eb546d36c221b58e`, the `dev` merge of
 [Rust client PR #103](https://github.com/F1R3FLY-io/rust-client/pull/103).
 It reads structured gRPC queue causes and supports legacy queue messages.
 It includes the refusal reconciliation and verdict handling from
