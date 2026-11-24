@@ -56,13 +56,12 @@ Check current PR status and branch revisions before starting new work.
 | `feature/cost-accounted-f1r3node` | Separate cost-accounting runtime, [#4](https://github.com/asi-alliance/asi-chain-wallet-cli/pull/4) | Outside this regular-node integration. Review its node/client pair separately. |
 
 The Cargo Git dependency pins `F1R3FLY-io/rust-client` at
-`dd1f182837b7c51648834fcbf88c797dd677b581`, the merge commit of
-[Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86) into
-`dev`. That merge includes `20c1402`, which resolves a landed deploy before
-reporting an admission refusal and prefers a canonical verdict over a queue
-rejection, and `6cd670a`, which keeps refusal and lookup causes for unknown
-outcomes. Its node protocol crates remain pinned to
-`0ccc315d84b32d668e8db49cd56ba3c576693e15`.
+`8416591d3f7cb60750c3c32eb1e1d69eb3dcd9a4` from
+[Rust client PR #103](https://github.com/F1R3FLY-io/rust-client/pull/103).
+It reads structured gRPC queue causes and supports legacy queue messages.
+It includes the refusal reconciliation and verdict handling from
+[Rust client PR #86](https://github.com/F1R3FLY-io/rust-client/pull/86).
+Its node protocol crates are pinned to `aca631e2ed02f73170558fbc3194efa48b9f1876`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
 Send checks the validator's token symbol and shard and reads its minimum Phlo
@@ -257,6 +256,17 @@ Transfer tokens to another address:
 ```bash
 cargo run -- send --to <recipient-address> --amount <amount>
 ```
+
+`send` submits the signed transfer once by default. To allow one retry of the
+same signed bytes within this invocation, add `--retry-deployer-share`. The
+CLI waits for the queue's `retry-after` only when the queue identifies the
+sender's share limit and the wait fits before expiration. A second refusal
+ends the command. Starting a new `send` signs a different deploy.
+
+For validator capacity, validator inactivity, shard finality or storage
+pressure, the CLI prints the cause and any wait. After the wait a new transfer
+needs a current block height. An unknown cause produces a generic queue-full
+refusal. For an unknown submission outcome, check the original deploy ID.
 
 **Example:**
 

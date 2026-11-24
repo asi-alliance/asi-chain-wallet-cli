@@ -167,7 +167,7 @@ services:
     networks: [shard]
     depends_on: [validator1]
     ports:
-      - "127.0.0.1:40414:40401"
+      - "127.0.0.1:${IT_PORT_40414:-40414}:40401"
 
   # Unbonded at genesis; started by the bonding tests.
   validator4:

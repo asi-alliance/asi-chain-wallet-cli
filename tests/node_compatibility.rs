@@ -141,6 +141,8 @@ impl Pending {
             state: "Pending".into(),
             rejection_count: 0,
             latest_block_hash: None,
+            queue_state: None,
+            detail: None,
         })
         .unwrap();
         let thread = std::thread::spawn(move || {
@@ -244,7 +246,10 @@ fn wallet_balance_transfer_rejection_and_timeout() {
             "--amount",
             "1",
         ],
-        &[("VALIDATOR_GRPC_URL", "http://127.0.0.1:40414")],
+        &[(
+            "VALIDATOR_GRPC_URL",
+            &format!("http://127.0.0.1:{}", common::node::port_base() + 14),
+        )],
     );
     let message = text(&refused);
     assert!(!refused.status.success(), "{message}");
