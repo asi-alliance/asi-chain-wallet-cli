@@ -64,9 +64,12 @@ It includes the refusal reconciliation and verdict handling from
 Its node protocol crates are pinned to `aca631e2ed02f73170558fbc3194efa48b9f1876`.
 The library preserves ASI metadata, exact raw-dust amounts and the
 `rho:vault:system` transfer ABI; its CLI remains disabled.
-Send checks the validator's token symbol and shard and reads its minimum Phlo
-price before signing. It uses a floor of one and signs with a uint256 price,
-subject to the client checking that price × Phlo limit fits in uint256.
+Send reads the submitting validator's `/api/status` once before signing and
+checks its token symbol and shard. It uses the exact minimum Phlo price with a
+floor of one and signs with a uint256 price, subject to the client checking that
+price × Phlo limit fits in uint256. The transfer Phlo limit is capped at the
+validator's reported `maxPhloLimit`; a null or non-positive cap is rejected, and
+when no cap is reported the default transfer limit is preserved.
 HTTP prices accept exact JSON integers and decimal strings.
 
 `Cargo.toml` selects the exact commit with `rev`, and `Cargo.lock` records the
