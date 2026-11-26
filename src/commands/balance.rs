@@ -1,14 +1,28 @@
 use crate::config::Config;
 use anyhow::{Result, ensure};
 use node_cli::{Balance, Endpoint, NodeHttp, f1r3fly_api::NodeStatus};
+use serde_json::Value;
 
 pub async fn metadata(config: &Config) -> Result<NodeStatus> {
-    metadata_at(config, &config.observer_http).await
+    validate_metadata(config, fetch_status(&config.observer_http).await?)
 }
 
-pub async fn metadata_at(config: &Config, endpoint: &Endpoint) -> Result<NodeStatus> {
+pub async fn validator_metadata(config: &Config) -> Result<NodeStatus> {
+    let status = fetch_status(&config.validator_http).await?;
+    ensure!(
+        !status.get("maxPhloLimit").is_some_and(Value::is_null),
+        "Validator has not reported its maximum Phlo limit yet"
+    );
+    validate_metadata(config, status)
+}
+
+async fn fetch_status(endpoint: &Endpoint) -> Result<Value> {
     let node = NodeHttp::new(endpoint.clone())?;
-    let status: NodeStatus = serde_json::from_value(node.get_json("/api/status").await?)?;
+    Ok(node.get_json("/api/status").await?)
+}
+
+fn validate_metadata(config: &Config, status: Value) -> Result<NodeStatus> {
+    let status: NodeStatus = serde_json::from_value(status)?;
     ensure!(
         status.native_token_symbol == config.expected_token_symbol,
         "Wrong native token: expected {}, node reports {}",
