@@ -6,7 +6,7 @@ mod utils;
 
 use clap::{Parser, Subcommand};
 use commands::*;
-use std::process;
+use std::process::ExitCode;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -29,7 +29,11 @@ pub enum Commands {
         to: String,
 
         #[arg(short, long)]
-        amount: u64,
+        amount: String,
+
+        /// On a deployer-share refusal, wait and resend the same signed transfer once.
+        #[arg(long)]
+        retry_deployer_share: bool,
     },
 
     #[command(visible_alias = "hist")]
@@ -58,7 +62,7 @@ impl Cli {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     dotenv::dotenv().ok();
 
     let cli = Cli::parse();
@@ -66,14 +70,18 @@ async fn main() {
         Ok(cfg) => cfg,
         Err(e) => {
             eprintln!("Error loading configuration: {}", e);
-            process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
 
     let result = match &cli.command {
         Some(Commands::Create { save }) => handle_create_wallet(*save),
         Some(Commands::Balance {}) => handle_get_balance().await,
-        Some(Commands::Send { to, amount }) => handle_send(to, *amount).await,
+        Some(Commands::Send {
+            to,
+            amount,
+            retry_deployer_share,
+        }) => handle_send(to, amount, *retry_deployer_share).await,
         Some(Commands::History { limit }) => handle_get_history(&config, *limit).await,
         Some(Commands::Export {
             format,
@@ -87,7 +95,11 @@ async fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {}", e);
-        process::exit(1);
+        eprintln!("Error: {e:#}");
+        // Return normally so errors that own resources (e.g. PersistError's
+        // temporary wallet file) are dropped before the process exits.
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

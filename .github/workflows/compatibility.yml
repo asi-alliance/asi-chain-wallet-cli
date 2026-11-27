@@ -1,0 +1,69 @@
+name: Wallet compatibility
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wallet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2026-02-09
+          components: rustfmt, clippy
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libssl-dev pkg-config cmake libclang-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wallet-client-029
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --features integration --locked -- -D warnings
+      - run: cargo test --release --locked
+      - run: cargo build --release --locked
+      - name: Build the node compatibility test
+        shell: bash
+        run: |
+          test_bin=$(cargo test --release --features integration --test node_compatibility --locked --no-run --message-format=json |
+            jq -r 'select(.reason == "compiler-artifact" and .target.name == "node_compatibility" and .executable != null) | .executable')
+          cp "$test_bin" target/release/node-compatibility-test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wallet-compatibility-binaries
+          path: |
+            target/release/asi-chain-wallet-cli
+            target/release/node-compatibility-test
+          if-no-files-found: error
+          retention-days: 1
+  node-compatibility:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      FIREFLY_NODE_IMAGE: amamata/rust-node@sha256:f835f503efbfc27d28025feb2710e3baa07e15e71c9553ac036b4a6d6c4a2eab
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: wallet-compatibility-binaries
+          path: target/release
+      - name: Run the node compatibility test
+        run: |
+          chmod +x target/release/asi-chain-wallet-cli target/release/node-compatibility-test
+          target/release/node-compatibility-test --nocapture
+      - name: Tear down the owned shard
+        if: always()
+        run: |
+          if [ -f target/integration-shard/shard.env ]; then
+            docker compose -p rust-client-it --env-file target/integration-shard/shard.env -f tests/integration/topology/compose.yml --profile joiner down -v --remove-orphans
+          fi

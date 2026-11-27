@@ -1,0 +1,11 @@
+.git
+**/.git
+target
+**/target
+credentials
+exports
+.env
+.env.*
+!.env.example
+**/wallet_info.json
+**/*.pem
