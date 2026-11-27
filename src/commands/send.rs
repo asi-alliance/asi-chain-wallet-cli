@@ -1,4 +1,4 @@
-use crate::balance::{get_balance, metadata, metadata_at};
+use crate::balance::{get_balance, metadata, validator_metadata};
 use crate::config::Config;
 use anyhow::{Result, anyhow, ensure};
 use node_cli::{
@@ -17,13 +17,25 @@ fn transfer_amount(value: &str) -> Result<BigUint> {
     Ok(node_cli::vault::parse_amount(significant)?)
 }
 
-fn transfer_deploy_options(min_phlo_price: BigUint, expiration: i64) -> DeployOptions {
-    DeployOptions {
-        phlo_limit: node_cli::vault::TRANSFER_PHLO_LIMIT,
+fn transfer_deploy_options(
+    min_phlo_price: BigUint,
+    max_phlo_limit: Option<i64>,
+    expiration: i64,
+) -> Result<DeployOptions> {
+    let mut phlo_limit = node_cli::vault::TRANSFER_PHLO_LIMIT;
+    if let Some(cap) = max_phlo_limit {
+        ensure!(
+            cap > 0,
+            "Validator reported an invalid maximum Phlo limit: {cap}"
+        );
+        phlo_limit = phlo_limit.min(u64::try_from(cap)?);
+    }
+    Ok(DeployOptions {
+        phlo_limit,
         phlo_price: min_phlo_price.max(1u8.into()),
         expiration: Some(expiration),
         ..DeployOptions::default()
-    }
+    })
 }
 
 fn send_error(id: &str, error: node_cli::Error) -> anyhow::Error {
@@ -112,7 +124,7 @@ pub async fn handle_send(to: &str, value: &str, retry_deployer_share: bool) -> R
     let config = Config::from_env()?;
     let (wallet, key) = config.signing_wallet()?;
     let token = metadata(&config).await?;
-    let validator = metadata_at(&config, &config.validator_http).await?;
+    let validator = validator_metadata(&config).await?;
     let balance = get_balance(&config, &wallet.address).await?;
     ensure!(
         balance.dust >= amount,
@@ -130,7 +142,11 @@ pub async fn handle_send(to: &str, value: &str, retry_deployer_share: bool) -> R
     let manager = F1r3flyConnectionManager::new(connection)?;
     let term = node_cli::vault::build_transfer_rholang(&wallet.address, to, &amount)?;
     let expiration_ms = chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000;
-    let options = transfer_deploy_options(validator.min_phlo_price, expiration_ms);
+    let options = transfer_deploy_options(
+        validator.min_phlo_price,
+        validator.max_phlo_limit,
+        expiration_ms,
+    )?;
     let signed = manager
         .api()
         .prepare(&term, &options)
@@ -205,7 +221,7 @@ mod tests {
             let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
             let key = SigningKey::from_hex(&"42".repeat(32)).unwrap();
             let expiration = chrono::Utc::now().timestamp_millis() + 60_000;
-            let options = transfer_deploy_options(1u8.into(), expiration);
+            let options = transfer_deploy_options(1u8.into(), None, expiration).unwrap();
             let signed = UnsignedDeploy::new("Nil", &options, 1, "root")
                 .unwrap()
                 .sign(key.secret_key());
@@ -279,9 +295,23 @@ mod tests {
     #[test]
     fn accepts_a_validator_phlo_price_of_two_to_the_63() {
         let price = BigUint::from(1u64 << 63);
-        let options = transfer_deploy_options(price.clone(), 1);
+        let options = transfer_deploy_options(price.clone(), Some(250_000), 1).unwrap();
         assert_eq!(options.phlo_price, price);
+        assert_eq!(options.phlo_limit, 250_000);
         node_cli::UnsignedDeploy::new("Nil", &options, 1, "root").unwrap();
+    }
+    #[test]
+    fn the_validator_cap_only_lowers_the_transfer_allowance() {
+        let default_limit = node_cli::vault::TRANSFER_PHLO_LIMIT;
+        for cap in [None, Some(20_000_000)] {
+            let options = transfer_deploy_options(0u8.into(), cap, 1).unwrap();
+            assert_eq!(options.phlo_limit, default_limit);
+            assert_eq!(options.phlo_price, 1u8.into());
+        }
+        for cap in [0, -1] {
+            let error = transfer_deploy_options(1u8.into(), Some(cap), 1).unwrap_err();
+            assert!(error.to_string().contains("invalid maximum Phlo limit"));
+        }
     }
     #[test]
     fn a_timeout_is_an_error_with_the_original_deploy_id() {
